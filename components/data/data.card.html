@@ -1,0 +1,86 @@
+<!-- @dsCard group="Components" viewport="700x420" name="Data & feedback" subtitle="KPI, badges, status, progress, tabs, avatar, table" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-app); font-family: var(--font-sans); }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .two { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: start; margin-bottom: 18px; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const NS = window.OcenkaPRODesignSystem_7e0e51;
+    const { Card, Badge, StatusBadge, KpiCard, ProgressBar, Avatar, Tabs, Table } = NS;
+    const I = ({ n }) => <i data-lucide={n}></i>;
+    function Demo() {
+      const [tab, setTab] = React.useState('all');
+      return (
+        <div>
+          <div className="kpis">
+            <KpiCard label="Активные заявки" value="24" icon={<I n="folder-open" />} delta="+8%" helper="за неделю" />
+            <KpiCard label="Средняя стоимость" value="8.4 млн ₽" icon={<I n="wallet" />} iconTone="accent" />
+            <KpiCard label="Соответствие ФСО" value="92%" icon={<I n="shield-check" />} iconTone="warning" />
+          </div>
+          <div className="row">
+            <StatusBadge status="new" />
+            <StatusBadge status="docs" />
+            <StatusBadge status="analogs" />
+            <StatusBadge status="calc" />
+            <StatusBadge status="review" />
+            <StatusBadge status="ready" />
+          </div>
+          <div className="row">
+            <Badge tone="success" pill dot>Высокая сопоставимость</Badge>
+            <Badge tone="warning" pill>Требует проверки</Badge>
+            <Badge tone="brand">DOCX</Badge>
+            <Badge tone="info">PDF</Badge>
+            <Badge tone="outline">12 документов</Badge>
+            <Avatar name="Иван Петров" />
+            <Avatar name="Анна Смирнова" size="sm" />
+          </div>
+          <div className="two">
+            <Card title="Соответствие требованиям ФСО">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <ProgressBar label="Раздел отчета" value={100} />
+                <ProgressBar label="Анализ рынка" value={80} tone="brand" />
+                <ProgressBar label="Согласование результатов" value={45} tone="warning" />
+              </div>
+            </Card>
+            <div>
+              <Tabs value={tab} onChange={setTab} items={[
+                { value: 'all', label: 'Все', count: 24 },
+                { value: 'new', label: 'Новые', count: 6 },
+                { value: 'review', label: 'На проверке', count: 3 },
+              ]} />
+            </div>
+          </div>
+          <Card noBodyPad>
+            <Table numeric columns={[
+              { key: 'id', header: '№' },
+              { key: 'obj', header: 'Объект' },
+              { key: 'price', header: 'Стоимость', align: 'right' },
+              { key: 'st', header: 'Статус', render: (r) => <StatusBadge status={r.st} /> },
+            ]} rows={[
+              { id: 'OЗ-1042', obj: 'Квартира, ул. Тверская 12', price: '8 450 000 ₽', st: 'ready' },
+              { id: 'OЗ-1041', obj: 'Офис, Пресненская наб. 8', price: '21 300 000 ₽', st: 'review' },
+              { id: 'OЗ-1040', obj: 'Дом, пос. Барвиха', price: '— ', st: 'analogs' },
+            ]} />
+          </Card>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+    setTimeout(() => window.lucide && window.lucide.createIcons(), 0);
+  </script>
+</body>
+</html>

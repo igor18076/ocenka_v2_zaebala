@@ -1,0 +1,56 @@
+@startuml use_case
+title Оценка PRO — Диаграмма прецедентов
+
+left to right direction
+skinparam actorStyle awesome
+skinparam backgroundColor #F8FAFC
+
+actor "Оценщик" as A
+actor "Клиент" as C
+actor "Банк / Заказчик" as B
+
+rectangle "Система Оценка PRO" {
+  usecase "Создать заявку" as UC1
+  usecase "Загрузить документы" as UC2
+  usecase "Описать объект оценки" as UC3
+  usecase "Подобрать аналоги" as UC4
+  usecase "Открыть карточку аналога" as UC4a
+  usecase "Отметить объявление как снятое" as UC4b
+  usecase "Выполнить расчет стоимости" as UC5
+  usecase "Сравнительный подход" as UC5a
+  usecase "Доходный подход" as UC5b
+  usecase "Затратный подход" as UC5c
+  usecase "Согласовать результаты" as UC5d
+  usecase "Проверить по ФСО" as UC6
+  usecase "Сформировать отчет" as UC7
+  usecase "Экспорт DOCX / PDF" as UC8
+  usecase "Просмотреть аналитику рынка" as UC9
+  usecase "Фильтровать данные аналитики" as UC9a
+  usecase "Управлять клиентами" as UC10
+  usecase "Настройки профиля" as UC11
+}
+
+C --> UC1
+B --> UC1
+A --> UC1
+A --> UC2
+A --> UC3
+A --> UC4
+UC4 .> UC4a : <<include>>
+UC4a .> UC4b : <<extend>>
+A --> UC5
+UC5 .> UC5a : <<include>>
+UC5 .> UC5b : <<extend>>
+UC5 .> UC5c : <<extend>>
+UC5 .> UC5d : <<include>>
+A --> UC6
+A --> UC7
+UC7 .> UC8 : <<include>>
+A --> UC9
+UC9 .> UC9a : <<extend>>
+A --> UC10
+A --> UC11
+
+UC6 ..> UC7 : <<предшествует>>
+
+@enduml

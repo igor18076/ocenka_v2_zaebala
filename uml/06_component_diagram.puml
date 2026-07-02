@@ -1,0 +1,120 @@
+@startuml component_diagram
+title Оценка PRO v2 — Диаграмма компонентов
+
+skinparam backgroundColor #F8FAFC
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #2A6FDB
+  FontColor #1e293b
+}
+skinparam database {
+  BackgroundColor #FFF7ED
+  BorderColor #F59E0B
+}
+skinparam package {
+  BackgroundColor #EFF6FF
+  BorderColor #2A6FDB
+}
+skinparam node {
+  BackgroundColor #F0FDF4
+  BorderColor #25A871
+}
+
+package "Навигация и оболочка" {
+  [SidebarV2\nБоковая навигация] as Sidebar
+  [TopbarV2\nПанель инструментов] as Topbar
+  [App\nКорневой компонент] as App
+}
+
+package "Экраны приложения" {
+  [DashboardScreenV2\nДашборд и KPI] as Dash
+  [RequestsScreenV2\nСписок заявок] as Req
+  [ObjectScreenV2\nКарточка объекта] as Obj
+  [AnalogsScreenV2\nПодбор аналогов\n+ модальное окно] as Ana
+  [CalcScreenV2\nРасчёт стоимости\n(3 подвкладки)] as Calc
+  [FsoScreenV2\nПроверка ФСО] as Fso
+  [ReportScreenV2\nФормирование отчёта] as Rep
+  [AnalyticsScreen\nАналитика рынка\n+ Chart.js графики] as Anlt
+  [ClientsScreenV2\nКлиенты] as Cli
+  [SettingsScreenV2\nНастройки] as Set
+}
+
+package "Дизайн-система" {
+  [_ds_bundle.js\nOcenkaPRODesignSystem] as DS
+  [Button / IconButton] as Btn
+  [Card / KpiCard] as Cards
+  [Table / Badge / Tabs] as Data
+  [Input / Select / Switch] as Forms
+  [Avatar / StatusBadge] as Misc2
+}
+
+database "OcenkaData\n(data.js — mock)" as Data {
+  [requests\nзаявки] as DReq
+  [analogs\nкраткие] as DAna
+  [analogsDetailed\nдетальные] as DAnaD
+  [approaches\nподходы] as DApp
+  [analyticsProps\n27 объектов] as DAnlt
+  [clients\nклиенты] as DCli
+}
+
+node "Внешние библиотеки (CDN)" {
+  [React 18.3.1] as React
+  [ReactDOM 18.3.1] as ReactDOM
+  [Babel Standalone 7.29] as Babel
+  [Chart.js 4.4.4] as ChartJS
+  [Lucide 0.469] as Lucide
+}
+
+' App связи
+App --> Sidebar
+App --> Topbar
+App --> Dash
+App --> Req
+App --> Obj
+App --> Ana
+App --> Calc
+App --> Fso
+App --> Rep
+App --> Anlt
+App --> Cli
+App --> Set
+
+' Данные
+Dash  --> DReq
+Req   --> DReq
+Obj   --> Data
+Ana   --> DAna
+Ana   --> DAnaD
+Calc  --> DApp
+Fso   --> Data
+Rep   --> Data
+Anlt  --> DAnlt
+Cli   --> DCli
+
+' Дизайн-система
+DS --> Btn
+DS --> Cards
+DS --> Data
+DS --> Forms
+DS --> Misc2
+
+Dash  ..> DS : использует компоненты
+Req   ..> DS
+Obj   ..> DS
+Ana   ..> DS
+Calc  ..> DS
+Fso   ..> DS
+Rep   ..> DS
+Anlt  ..> DS
+
+' Внешние зависимости
+App   ..> React
+App   ..> ReactDOM
+App   ..> Babel
+Anlt  ..> ChartJS : Canvas-графики
+Sidebar ..> Lucide : иконки
+Ana   ..> Lucide
+Calc  ..> Lucide
+
+@enduml

@@ -1,0 +1,18 @@
+{
+  "name": "ocenka-pro-v2",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "db:seed": "node --no-warnings backend/scripts/seed.js",
+    "start": "node --no-warnings backend/server.js",
+    "check": "node --check backend/server.js && node --check backend/scripts/seed.js && node --check backend/scripts/smoke.js",
+    "smoke": "node --no-warnings backend/scripts/smoke.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.1.200"
+  }
+}

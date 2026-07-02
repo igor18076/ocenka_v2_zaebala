@@ -1,0 +1,35 @@
+<!-- @dsCard group="Type" viewport="700x180" name="Font families" subtitle="Golos Text for UI, IBM Plex Mono for identifiers" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 22px; background: var(--surface-card); font-family: var(--font-sans); color: var(--text-strong); }
+  .fam { display: flex; gap: 18px; align-items: baseline; padding: 12px 0; border-bottom: 1px solid var(--divider); }
+  .fam:last-child { border-bottom: none; }
+  .tag { width: 130px; flex: none; }
+  .tag .k { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .tag .v { font-family: var(--font-mono); font-size: 12px; color: var(--text-body); }
+  .spec-sans { font-size: 26px; font-weight: 500; }
+  .spec-mono { font-family: var(--font-mono); font-size: 22px; }
+  .sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="fam">
+    <div class="tag"><div class="k">Sans · UI</div><div class="v">Golos Text</div></div>
+    <div>
+      <div class="spec-sans">Оценка PRO — Аа Бб Вв 1234567890</div>
+      <div class="sub">400 Regular · 500 Medium · 600 Semibold · 700 Bold · 800 Extrabold</div>
+    </div>
+  </div>
+  <div class="fam">
+    <div class="tag"><div class="k">Mono · Data</div><div class="v">IBM Plex Mono</div></div>
+    <div>
+      <div class="spec-mono">77:01:0004012:1245</div>
+      <div class="sub">Кадастровые номера, ID заявок, коды · 400 / 500 / 600</div>
+    </div>
+  </div>
+</body>
+</html>

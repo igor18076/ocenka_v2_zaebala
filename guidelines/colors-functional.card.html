@@ -1,0 +1,26 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Functional / feedback" subtitle="Success, warning, danger, info — muted, never acid" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 20px; background: var(--surface-card); font-family: var(--font-sans); }
+  .row { display: flex; gap: 14px; }
+  .item { flex: 1; }
+  .pair { display: flex; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--card-ring); }
+  .solid { flex: 1; height: 52px; }
+  .soft { width: 38px; }
+  .name { font-size: 12px; font-weight: 600; color: var(--text-strong); margin-top: 8px; }
+  .hex { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="row">
+    <div class="item"><div class="pair"><div class="solid" style="background:var(--success)"></div><div class="soft" style="background:var(--success-soft)"></div></div><div class="name">Success</div><div class="hex">#109A6A</div></div>
+    <div class="item"><div class="pair"><div class="solid" style="background:var(--warning)"></div><div class="soft" style="background:var(--warning-soft)"></div></div><div class="name">Warning</div><div class="hex">#C77A12</div></div>
+    <div class="item"><div class="pair"><div class="solid" style="background:var(--danger)"></div><div class="soft" style="background:var(--danger-soft)"></div></div><div class="name">Danger</div><div class="hex">#D64545</div></div>
+    <div class="item"><div class="pair"><div class="solid" style="background:var(--info)"></div><div class="soft" style="background:var(--info-soft)"></div></div><div class="name">Info</div><div class="hex">#2F62AD</div></div>
+  </div>
+</body>
+</html>

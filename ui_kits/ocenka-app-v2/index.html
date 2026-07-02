@@ -1,0 +1,118 @@
+<!-- @dsCard group="Ocenka App" viewport="1360x840" name="Оценщик PRO v2" subtitle="v2: детальные аналоги, калькулятор с подвкладками, аналитика рынка" -->
+<!-- @startingPoint section="Ocenka App" subtitle="Full appraiser web app v2 — analogs modal, calc tabs, market analytics" viewport="1360x840" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оценка PRO v2 — рабочее пространство оценщика</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--surface-app); overflow: hidden; }
+  #app { height: 100vh; display: flex; }
+  .ock-main    { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ock-content { flex: 1; overflow-y: auto; padding: 28px 32px 48px; }
+  .ock-content-inner { max-width: 1320px; margin: 0 auto; }
+  @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+
+  <script src="data.js"></script>
+  <script type="text/babel" src="_shared.jsx"></script>
+  <script type="text/babel" src="SidebarV2.jsx"></script>
+  <script type="text/babel" src="TopbarV2.jsx"></script>
+  <script type="text/babel" src="DashboardScreenV2.jsx"></script>
+  <script type="text/babel" src="RequestsScreenV2.jsx"></script>
+  <script type="text/babel" src="ObjectScreenV2.jsx"></script>
+  <script type="text/babel" src="AnalogsScreenV2.jsx"></script>
+  <script type="text/babel" src="CalcScreenV2.jsx"></script>
+  <script type="text/babel" src="FsoScreenV2.jsx"></script>
+  <script type="text/babel" src="ReportScreenV2.jsx"></script>
+  <script type="text/babel" src="MiscScreensV2.jsx"></script>
+  <script type="text/babel" src="AnalyticsScreen.jsx"></script>
+
+  <script type="text/babel" data-presets="react">
+    function App() {
+      const [active, setActive] = React.useState('dashboard');
+      const [toastMsg, setToastMsg] = React.useState(null);
+      const contentRef = React.useRef(null);
+
+      const toast = (msg) => {
+        setToastMsg(msg);
+        clearTimeout(window.__t);
+        window.__t = setTimeout(() => setToastMsg(null), 2600);
+      };
+
+      const navigate = (key) => {
+        setActive(key);
+        if (contentRef.current) contentRef.current.scrollTop = 0;
+      };
+      const openRequest = () => navigate('objects');
+
+      React.useEffect(() => {
+        window.ocenkaGoTo = (key) => {
+          setActive(key);
+          if (contentRef.current) contentRef.current.scrollTop = 0;
+        };
+      }, []);
+
+      React.useEffect(() => { window.materializeIcons && window.materializeIcons(); });
+
+      const screens = {
+        dashboard: <DashboardScreenV2 onOpenRequest={openRequest} onNavigate={navigate} />,
+        requests:  <RequestsScreenV2 onOpenRequest={openRequest} />,
+        objects:   <ObjectScreenV2 onBack={() => navigate('requests')} onNavigate={navigate} toast={toast} />,
+        analogs:   <AnalogsScreenV2 onNavigate={navigate} toast={toast} />,
+        calc:      <CalcScreenV2 onNavigate={navigate} toast={toast} />,
+        reports:   <ReportScreenV2 toast={toast} />,
+        fso:       <FsoScreenV2 onNavigate={navigate} toast={toast} />,
+        analytics: <AnalyticsScreen />,
+        clients:   <ClientsScreenV2 toast={toast} />,
+        settings:  <SettingsScreenV2 toast={toast} />,
+      };
+
+      return (
+        <React.Fragment>
+          <SidebarV2 active={active} onNavigate={navigate} />
+          <div className="ock-main">
+            <TopbarV2 onNewAppraisal={() => {
+              navigate('requests');
+              window.setTimeout(() => window.dispatchEvent(new Event('ocenka:create-request')), 0);
+            }} />
+            <div className="ock-content ds-scroll" ref={contentRef}>
+              <div className="ock-content-inner">
+                {screens[active] || screens.dashboard}
+              </div>
+            </div>
+          </div>
+          {toastMsg ? (
+            <div style={{
+              position:'fixed', right:24, bottom:24, zIndex:50,
+              display:'flex', alignItems:'center', gap:10,
+              background:'var(--neutral-900)', color:'#fff',
+              padding:'12px 16px', borderRadius:'var(--radius-md)',
+              boxShadow:'var(--shadow-lg)', fontSize:'var(--text-sm)', fontWeight:500,
+              animation:'toastIn .22s var(--ease-out)',
+            }}>
+              <span style={{ color:'var(--emerald-300)', display:'inline-flex' }}><Icon n="check-circle-2" size={18} /></span>
+              {toastMsg}
+            </div>
+          ) : null}
+        </React.Fragment>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    setTimeout(() => window.materializeIcons && window.materializeIcons(), 60);
+  </script>
+</body>
+</html>

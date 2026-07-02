@@ -1,0 +1,10 @@
+/* ============================================================
+   Ocenka PRO — Fonts
+   Golos Text: Russian-designed UI family, full Cyrillic, neutral
+   and trustworthy — primary for all UI text.
+   IBM Plex Mono: technical identifiers (cadastral №, IDs, codes).
+   Loaded from Google Fonts CDN.
+   NOTE: substitution by necessity — no brand fonts were supplied.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');

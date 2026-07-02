@@ -1,0 +1,163 @@
+/* ============================================================
+   Ocenka PRO — Color tokens
+   Deep blue (trust / legal), graphite neutrals, emerald (value).
+   Base scales first, then semantic aliases.
+   ============================================================ */
+
+:root {
+  /* ---- Brand: deep blue ----------------------------------- */
+  --blue-50:  #EEF3FB;
+  --blue-100: #DBE6F6;
+  --blue-200: #B7CDEC;
+  --blue-300: #8AAADB;
+  --blue-400: #5683C6;
+  --blue-500: #2F62AD;
+  --blue-600: #1E4A8F;   /* primary action */
+  --blue-700: #173A72;
+  --blue-800: #142F5B;
+  --blue-900: #112545;
+  --blue-950: #0B182F;
+
+  /* ---- Accent: emerald (value, success) ------------------- */
+  --emerald-50:  #E8F7EF;
+  --emerald-100: #C9EEDC;
+  --emerald-200: #99DCBC;
+  --emerald-300: #5DC393;
+  --emerald-400: #25A871;
+  --emerald-500: #109A6A;   /* primary accent */
+  --emerald-600: #0C7E57;
+  --emerald-700: #096344;
+  --emerald-800: #084E37;
+  --emerald-900: #06402D;
+
+  /* ---- Teal (secondary accent, data viz) ------------------ */
+  --teal-100: #D5F1F2;
+  --teal-300: #67C7CC;
+  --teal-500: #0E9CA3;
+  --teal-700: #0A6B70;
+
+  /* ---- Neutrals: cool graphite ---------------------------- */
+  --neutral-0:   #FFFFFF;
+  --neutral-50:  #F7F8FA;
+  --neutral-100: #EDEFF3;
+  --neutral-200: #DFE3EA;
+  --neutral-300: #C8CEDA;
+  --neutral-400: #9AA3B4;
+  --neutral-500: #6B7488;
+  --neutral-600: #4D5668;
+  --neutral-700: #3A4150;
+  --neutral-800: #272D3A;   /* graphite */
+  --neutral-900: #1A1F29;
+  --neutral-950: #0F131B;
+
+  /* ---- Functional hues ------------------------------------ */
+  --amber-100: #FBF0D9;
+  --amber-500: #C77A12;
+  --amber-700: #8A5306;
+
+  --red-50:  #FCEBEB;
+  --red-100: #F8D7D7;
+  --red-500: #D64545;
+  --red-600: #B83232;
+  --red-700: #8E2626;
+
+  --cyan-100: #E0F3F8;
+  --cyan-500: #0E8AA6;
+  --cyan-700: #0A6276;
+
+  --violet-100: #ECE8FA;
+  --violet-500: #6A50C2;
+  --violet-700: #4B3690;
+
+  /* ============================================================
+     Semantic aliases
+     ============================================================ */
+
+  /* Surfaces */
+  --surface-app:      var(--neutral-50);
+  --surface-card:     var(--neutral-0);
+  --surface-raised:   var(--neutral-0);
+  --surface-sunken:   var(--neutral-100);
+  --surface-inset:    var(--neutral-50);
+  --surface-hover:    var(--neutral-100);
+  --surface-active:   var(--neutral-200);
+  --surface-brand:    var(--blue-600);
+  --surface-brand-soft: var(--blue-50);
+  --surface-accent-soft: var(--emerald-50);
+  --surface-sidebar:  var(--neutral-900);
+  --surface-sidebar-hover: var(--neutral-800);
+  --surface-overlay:  rgba(15, 19, 27, 0.55);
+
+  /* Text */
+  --text-strong:    var(--neutral-900);
+  --text-body:      var(--neutral-700);
+  --text-muted:     var(--neutral-500);
+  --text-subtle:    var(--neutral-400);
+  --text-on-brand:  var(--neutral-0);
+  --text-on-accent: var(--neutral-0);
+  --text-link:      var(--blue-600);
+  --text-brand:     var(--blue-700);
+  --text-value:     var(--emerald-600);
+  --text-on-sidebar:      #C3CAD8;
+  --text-on-sidebar-strong: var(--neutral-0);
+  --text-on-sidebar-muted:  #7E889C;
+
+  /* Borders */
+  --border-subtle:  var(--neutral-200);
+  --border-default: var(--neutral-300);
+  --border-strong:  var(--neutral-400);
+  --border-brand:   var(--blue-600);
+  --border-focus:   var(--blue-500);
+  --divider:        var(--neutral-200);
+
+  /* Brand action states */
+  --action-primary:        var(--blue-600);
+  --action-primary-hover:  var(--blue-700);
+  --action-primary-active: var(--blue-800);
+  --action-accent:         var(--emerald-500);
+  --action-accent-hover:   var(--emerald-600);
+  --action-accent-active:  var(--emerald-700);
+
+  /* Feedback */
+  --success:       var(--emerald-500);
+  --success-soft:  var(--emerald-50);
+  --success-text:  var(--emerald-700);
+  --warning:       var(--amber-500);
+  --warning-soft:  var(--amber-100);
+  --warning-text:  var(--amber-700);
+  --danger:        var(--red-500);
+  --danger-soft:   var(--red-50);
+  --danger-text:   var(--red-700);
+  --info:          var(--blue-500);
+  --info-soft:     var(--blue-50);
+  --info-text:     var(--blue-700);
+
+  /* Focus ring */
+  --ring: 0 0 0 3px rgba(47, 98, 173, 0.30);
+  --ring-danger: 0 0 0 3px rgba(214, 69, 69, 0.28);
+
+  /* ---- Status badge palette (request lifecycle) ----------- */
+  --status-new-bg:    var(--blue-50);
+  --status-new-fg:    var(--blue-700);
+  --status-new-dot:   var(--blue-500);
+
+  --status-docs-bg:   var(--cyan-100);
+  --status-docs-fg:   var(--cyan-700);
+  --status-docs-dot:  var(--cyan-500);
+
+  --status-analogs-bg:  var(--violet-100);
+  --status-analogs-fg:  var(--violet-700);
+  --status-analogs-dot: var(--violet-500);
+
+  --status-calc-bg:   var(--teal-100);
+  --status-calc-fg:   var(--teal-700);
+  --status-calc-dot:  var(--teal-500);
+
+  --status-review-bg: var(--amber-100);
+  --status-review-fg: var(--amber-700);
+  --status-review-dot: var(--amber-500);
+
+  --status-ready-bg:  var(--emerald-50);
+  --status-ready-fg:  var(--emerald-700);
+  --status-ready-dot: var(--emerald-500);
+}

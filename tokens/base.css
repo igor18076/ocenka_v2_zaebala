@@ -1,0 +1,66 @@
+/* ============================================================
+   Ocenka PRO — Base reset & element defaults
+   Lightweight; only what the brand needs globally.
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-body);
+  background: var(--surface-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'tnum' 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  color: var(--text-strong);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-snug);
+}
+
+p { margin: 0; }
+
+a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+button { font-family: inherit; }
+
+/* Numeric / tabular utility (tables, money, metrics) */
+.ds-tnum { font-variant-numeric: tabular-nums lining-nums; }
+.ds-mono { font-family: var(--font-mono); }
+
+/* Eyebrow / overline */
+.ds-overline {
+  font-size: var(--type-overline-size);
+  font-weight: var(--type-overline-weight);
+  letter-spacing: var(--type-overline-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+::selection {
+  background: var(--blue-100);
+  color: var(--blue-900);
+}
+
+/* Custom scrollbars within app panels */
+.ds-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.ds-scroll::-webkit-scrollbar-thumb {
+  background: var(--neutral-300);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.ds-scroll::-webkit-scrollbar-thumb:hover { background: var(--neutral-400); }

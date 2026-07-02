@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+npm-debug.log
+Dockerfile
+compose.yaml
+docker-compose.yml
+.dockerignore
+backend/db/*.sqlite
+backend/db/*.sqlite-*
+screenshots
+uploads

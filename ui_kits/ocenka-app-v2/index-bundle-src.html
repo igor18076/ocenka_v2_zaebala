@@ -1,0 +1,156 @@
+<!-- @dsCard group="Ocenka App" viewport="1360x840" name="Оценщик PRO v2" subtitle="v2: детальные аналоги, калькулятор с подвкладками, аналитика рынка" -->
+<!-- @startingPoint section="Ocenka App" subtitle="Full appraiser web app v2 — analogs modal, calc tabs, market analytics" viewport="1360x840" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Оценка PRO v2 — рабочее пространство оценщика</title>
+<link rel="stylesheet" href="../../styles.css">
+<meta name="ext-resource-dependency" content="../../assets/mark.svg" data-resource-id="markSvg" />
+<template id="__bundler_thumbnail" data-bg-color="#141929">
+  <svg viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg">
+    <!-- Sidebar strip -->
+    <rect x="0" y="0" width="72" height="260" fill="#1a2236"/>
+    <!-- Logo mark placeholder -->
+    <rect x="16" y="18" width="28" height="28" rx="6" fill="#2A6FDB"/>
+    <rect x="16" y="58" width="40" height="7" rx="3" fill="#5DC393"/>
+    <!-- Nav items -->
+    <rect x="10" y="82" width="52" height="8" rx="4" fill="rgba(255,255,255,.18)"/>
+    <rect x="10" y="98" width="52" height="8" rx="4" fill="rgba(255,255,255,.08)"/>
+    <rect x="10" y="114" width="52" height="8" rx="4" fill="rgba(255,255,255,.08)"/>
+    <rect x="10" y="130" width="52" height="8" rx="4" fill="rgba(255,255,255,.08)"/>
+    <rect x="10" y="146" width="52" height="8" rx="4" fill="rgba(255,255,255,.08)"/>
+    <!-- Main area -->
+    <rect x="80" y="0" width="320" height="260" fill="#f1f4f9"/>
+    <!-- Topbar -->
+    <rect x="80" y="0" width="320" height="36" fill="#ffffff"/>
+    <rect x="92" y="12" width="100" height="12" rx="4" fill="#e2e8f0"/>
+    <!-- KPI cards -->
+    <rect x="88"  y="50" width="68" height="36" rx="6" fill="#fff"/>
+    <rect x="164" y="50" width="68" height="36" rx="6" fill="#fff"/>
+    <rect x="240" y="50" width="68" height="36" rx="6" fill="#fff"/>
+    <rect x="316" y="50" width="68" height="36" rx="6" fill="#fff"/>
+    <!-- Chart bars -->
+    <rect x="88"  y="120" width="16" height="80" rx="3" fill="#2A6FDB" opacity=".7"/>
+    <rect x="110" y="140" width="16" height="60" rx="3" fill="#2A6FDB" opacity=".7"/>
+    <rect x="132" y="130" width="16" height="70" rx="3" fill="#2A6FDB" opacity=".7"/>
+    <rect x="154" y="150" width="16" height="50" rx="3" fill="#2A6FDB" opacity=".7"/>
+    <rect x="176" y="125" width="16" height="75" rx="3" fill="#25A871" opacity=".7"/>
+    <rect x="198" y="135" width="16" height="65" rx="3" fill="#25A871" opacity=".7"/>
+    <!-- Right panel -->
+    <rect x="248" y="110" width="140" height="95" rx="6" fill="#fff"/>
+    <rect x="260" y="122" width="60" height="8" rx="3" fill="#e2e8f0"/>
+    <rect x="260" y="138" width="100" height="6" rx="3" fill="#2A6FDB" opacity=".6"/>
+    <rect x="260" y="150" width="80"  height="6" rx="3" fill="#25A871" opacity=".5"/>
+    <rect x="260" y="162" width="90"  height="6" rx="3" fill="#F59E0B" opacity=".5"/>
+    <!-- Оценка PRO label -->
+    <text x="92" y="30" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#334155">Оценка PRO</text>
+  </svg>
+</template>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--surface-app); overflow: hidden; }
+  #app { height: 100vh; display: flex; }
+  .ock-main    { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .ock-content { flex: 1; overflow-y: auto; padding: 28px 32px 48px; }
+  .ock-content-inner { max-width: 1320px; margin: 0 auto; }
+  @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+
+  <script src="data.js"></script>
+  <script type="text/babel" src="_shared.jsx"></script>
+  <script type="text/babel" src="SidebarV2.jsx"></script>
+  <script type="text/babel" src="TopbarV2.jsx"></script>
+  <script type="text/babel" src="DashboardScreenV2.jsx"></script>
+  <script type="text/babel" src="RequestsScreenV2.jsx"></script>
+  <script type="text/babel" src="ObjectScreenV2.jsx"></script>
+  <script type="text/babel" src="AnalogsScreenV2.jsx"></script>
+  <script type="text/babel" src="CalcScreenV2.jsx"></script>
+  <script type="text/babel" src="FsoScreenV2.jsx"></script>
+  <script type="text/babel" src="ReportScreenV2.jsx"></script>
+  <script type="text/babel" src="MiscScreensV2.jsx"></script>
+  <script type="text/babel" src="AnalyticsScreen.jsx"></script>
+
+  <script type="text/babel" data-presets="react">
+    function App() {
+      const [active, setActive] = React.useState('dashboard');
+      const [toastMsg, setToastMsg] = React.useState(null);
+      const contentRef = React.useRef(null);
+
+      const toast = (msg) => {
+        setToastMsg(msg);
+        clearTimeout(window.__t);
+        window.__t = setTimeout(() => setToastMsg(null), 2600);
+      };
+
+      const navigate = (key) => {
+        setActive(key);
+        if (contentRef.current) contentRef.current.scrollTop = 0;
+      };
+      const openRequest = () => navigate('objects');
+
+      React.useEffect(() => {
+        window.ocenkaGoTo = (key) => {
+          setActive(key);
+          if (contentRef.current) contentRef.current.scrollTop = 0;
+        };
+      }, []);
+
+      React.useEffect(() => { window.materializeIcons && window.materializeIcons(); });
+
+      const screens = {
+        dashboard: <DashboardScreenV2 onOpenRequest={openRequest} onNavigate={navigate} />,
+        requests:  <RequestsScreenV2 onOpenRequest={openRequest} />,
+        objects:   <ObjectScreenV2 onBack={() => navigate('requests')} onNavigate={navigate} />,
+        analogs:   <AnalogsScreenV2 onNavigate={navigate} />,
+        calc:      <CalcScreenV2 onNavigate={navigate} />,
+        reports:   <ReportScreenV2 toast={toast} />,
+        fso:       <FsoScreenV2 onNavigate={navigate} />,
+        analytics: <AnalyticsScreen />,
+        clients:   <ClientsScreenV2 />,
+        settings:  <SettingsScreenV2 />,
+      };
+
+      return (
+        <React.Fragment>
+          <SidebarV2 active={active} onNavigate={navigate} />
+          <div className="ock-main">
+            <TopbarV2 onNewAppraisal={() => toast('Открыта форма новой оценки')} />
+            <div className="ock-content ds-scroll" ref={contentRef}>
+              <div className="ock-content-inner">
+                {screens[active] || screens.dashboard}
+              </div>
+            </div>
+          </div>
+          {toastMsg ? (
+            <div style={{
+              position:'fixed', right:24, bottom:24, zIndex:50,
+              display:'flex', alignItems:'center', gap:10,
+              background:'var(--neutral-900)', color:'#fff',
+              padding:'12px 16px', borderRadius:'var(--radius-md)',
+              boxShadow:'var(--shadow-lg)', fontSize:'var(--text-sm)', fontWeight:500,
+              animation:'toastIn .22s var(--ease-out)',
+            }}>
+              <span style={{ color:'var(--emerald-300)', display:'inline-flex' }}><Icon n="check-circle-2" size={18} /></span>
+              {toastMsg}
+            </div>
+          ) : null}
+        </React.Fragment>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    setTimeout(() => window.materializeIcons && window.materializeIcons(), 60);
+  </script>
+</body>
+</html>

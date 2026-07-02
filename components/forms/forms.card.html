@@ -1,0 +1,61 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Form controls" subtitle="Input, Select, Checkbox, Radio, Switch" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-card); font-family: var(--font-sans); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 24px; align-items: start; }
+  .stack { display: flex; flex-direction: column; gap: 12px; }
+  .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel">
+    const { Input, Select, Checkbox, Switch } = window.OcenkaPRODesignSystem_7e0e51;
+    const I = ({ n }) => <i data-lucide={n}></i>;
+    function Demo() {
+      return (
+        <div className="grid">
+          <div className="stack">
+            <Input label="Адрес объекта" placeholder="г. Москва, ул. …" required defaultValue="г. Москва, ул. Тверская, 12" />
+            <Input prefix={<I n="search" />} placeholder="Поиск по заявкам" />
+            <Input label="Площадь" suffix={<span>м²</span>} defaultValue="58.4" />
+          </div>
+          <div className="stack">
+            <Select label="Тип оценки" options={[
+              { value: 'm', label: 'Рыночная стоимость' },
+              { value: 'c', label: 'Кадастровая стоимость' },
+              { value: 'l', label: 'Ликвидационная стоимость' },
+            ]} />
+            <Input label="E-mail" error="Некорректный адрес" defaultValue="ivan@" />
+          </div>
+          <div className="stack">
+            <Checkbox label="Заполнено задание на оценку" defaultChecked />
+            <Checkbox label="Проведен анализ рынка" />
+            <div className="row">
+              <Checkbox type="radio" name="ap" label="Сравнительный" defaultChecked />
+              <Checkbox type="radio" name="ap" label="Доходный" />
+              <Checkbox type="radio" name="ap" label="Затратный" />
+            </div>
+          </div>
+          <div className="stack">
+            <Switch label="Применять доходный подход" defaultChecked />
+            <Switch label="Уведомления по e-mail" />
+            <Switch label="Отключено" disabled />
+          </div>
+        </div>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+    setTimeout(() => window.lucide && window.lucide.createIcons(), 0);
+  </script>
+</body>
+</html>

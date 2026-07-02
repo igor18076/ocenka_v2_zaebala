@@ -1,0 +1,26 @@
+services:
+  ocenka:
+    build:
+      context: .
+    image: ocenka-pro-v2:local
+    container_name: ocenka-pro-v2
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4173
+      OCENKA_DB_PATH: /app/data/ocenka.sqlite
+      # Change before first start if you want another seed password.
+      OCENKA_SEED_PASSWORD: ocenka123
+    ports:
+      - "4173:4173"
+    volumes:
+      - ocenka_data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  ocenka_data:

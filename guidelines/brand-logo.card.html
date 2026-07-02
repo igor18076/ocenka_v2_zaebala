@@ -1,0 +1,37 @@
+<!-- @dsCard group="Brand" viewport="700x190" name="Logo & lockup" subtitle="Mark on light & dark, full wordmark" -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  body { margin: 0; padding: 22px; background: var(--surface-card); font-family: var(--font-sans); display: flex; gap: 18px; align-items: stretch; }
+  .panel { flex: 1; border-radius: var(--radius-lg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 22px; }
+  .light { background: var(--surface-card); box-shadow: var(--card-ring); }
+  .dark { background: var(--neutral-900); }
+  .lockup { display: flex; align-items: center; gap: 11px; }
+  .lockup img { width: 38px; height: 38px; display: block; }
+  .wm { display: flex; flex-direction: column; line-height: 1; }
+  .wm .n { font-size: 19px; font-weight: 800; letter-spacing: -.01em; }
+  .wm .s { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; margin-top: 3px; }
+  .cap { font-size: 11px; color: var(--text-muted); }
+  .cap-dark { font-size: 11px; color: var(--text-on-sidebar-muted); }
+</style>
+</head>
+<body>
+  <div class="panel light">
+    <div class="lockup">
+      <img src="../assets/mark.svg" alt="">
+      <div class="wm"><span class="n" style="color:var(--neutral-900)">Оценка<span style="color:var(--blue-600)"> PRO</span></span><span class="s" style="color:var(--text-muted)">Автоматизация оценки</span></div>
+    </div>
+    <div class="cap">На светлом фоне</div>
+  </div>
+  <div class="panel dark">
+    <div class="lockup">
+      <img src="../assets/mark.svg" alt="">
+      <div class="wm"><span class="n" style="color:#fff">Оценка<span style="color:#5DC393"> PRO</span></span><span class="s" style="color:var(--text-on-sidebar-muted)">Автоматизация оценки</span></div>
+    </div>
+    <div class="cap-dark">На графитовом фоне (сайдбар)</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,35 @@
+/* ============================================================
+   Ocenka PRO — Spacing & layout tokens
+   4px base grid.
+   ============================================================ */
+
+:root {
+  --space-0:  0;
+  --space-1:  2px;
+  --space-2:  4px;
+  --space-3:  6px;
+  --space-4:  8px;
+  --space-5:  12px;
+  --space-6:  16px;
+  --space-7:  20px;
+  --space-8:  24px;
+  --space-9:  32px;
+  --space-10: 40px;
+  --space-11: 48px;
+  --space-12: 64px;
+  --space-14: 80px;
+  --space-16: 96px;
+
+  /* ---- Layout dimensions ---------------------------------- */
+  --sidebar-width:        252px;
+  --sidebar-width-collapsed: 64px;
+  --topbar-height:        60px;
+  --content-max:          1320px;
+  --content-pad-x:        32px;
+  --content-pad-x-mobile: 16px;
+
+  /* ---- Common gaps ---------------------------------------- */
+  --gap-card:     20px;
+  --gap-section:  24px;
+  --gap-grid:     16px;
+}
