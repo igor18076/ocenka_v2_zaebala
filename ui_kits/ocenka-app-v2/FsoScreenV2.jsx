@@ -1,16 +1,37 @@
 /* ФСО compliance checklist with live progress. window.FsoScreen */
 window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
   const { Card, Button, ProgressBar, Badge } = NS;
-  const [items, setItems] = React.useState(window.OcenkaData.fso.map((x) => ({ ...x })));
   const requestId = request?.id || window.OcenkaData.object?.id;
+  const storageKey = (id) => `ocenka.fso.${id || 'draft'}.v1`;
+  const baseItems = () => window.OcenkaData.fso.map((x) => ({ ...x }));
+  const loadItems = (id) => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey(id)) || 'null');
+      return Array.isArray(saved) ? saved : baseItems();
+    } catch {
+      return baseItems();
+    }
+  };
+  const [items, setItems] = React.useState(() => loadItems(requestId));
+  const [loadedRequestId, setLoadedRequestId] = React.useState(requestId);
 
   const done = items.filter((i) => i.done).length;
   const pct = Math.round((done / items.length) * 100);
   const toggle = (idx) => setItems((arr) => arr.map((it, i) => i === idx ? { ...it, done: !it.done } : it));
   const recheck = () => {
-    setItems(window.OcenkaData.fso.map((x) => ({ ...x })));
+    setItems(baseItems());
     if (toast) toast('Проверка ФСО обновлена');
   };
+  React.useEffect(() => {
+    setItems(loadItems(requestId));
+    setLoadedRequestId(requestId);
+  }, [requestId]);
+  React.useEffect(() => {
+    if (loadedRequestId !== requestId) return;
+    try {
+      window.localStorage.setItem(storageKey(requestId), JSON.stringify(items));
+    } catch {}
+  }, [requestId, loadedRequestId, items]);
 
   return (
     <div>

@@ -29,6 +29,13 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
   const [tab, setTab] = React.useState('params');
   const [docs, setDocs] = React.useState(o.docs || []);
   const fileRef = React.useRef(null);
+  const readSavedCalculation = (id) => {
+    try {
+      return JSON.parse(window.localStorage.getItem(`ocenka.calculation.${id || 'draft'}.v1`) || 'null') || {};
+    } catch {
+      return {};
+    }
+  };
 
   const fileIcon = (kind) => kind === 'doc' ? 'file-text' : 'file';
   const fieldStyle = { width:'100%', boxSizing:'border-box', border:'1px solid var(--border-default)', borderRadius:'var(--radius-sm)', padding:'8px 10px', font:'inherit', color:'var(--text-strong)', background:'var(--surface-card)', outline:'none' };
@@ -69,6 +76,24 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
       window.localStorage.setItem(objectStorageKey(o.id), JSON.stringify({ ...o, docs }));
     } catch {}
   }, [o, docs]);
+  const savedCalculation = readSavedCalculation(o.id);
+  const summaryValue = savedCalculation.final
+    ? Math.round(savedCalculation.final).toLocaleString('ru')
+    : D.result.value;
+  const requiredFields = [o.title, o.address, o.type, o.area, o.floors, o.year, o.cadastral, o.purpose, o.valueType, o.date, o.client];
+  const completedFields = requiredFields.filter((value) => String(value || '').trim()).length;
+  const readiness = Math.min(100, Math.round((completedFields / requiredFields.length) * 70) + Math.min(20, docs.length * 5) + (Number(o.photos) > 0 ? 10 : 0));
+  const summaryMetric = (label, value, icon, tone) => (
+    <div style={{ padding:'10px 12px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)', display:'flex', alignItems:'center', gap:10 }}>
+      <span style={{ width:30, height:30, borderRadius:'var(--radius-sm)', background:tone || 'var(--blue-50)', color:'var(--blue-700)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <Icon n={icon} size={15} />
+      </span>
+      <div style={{ minWidth:0 }}>
+        <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.04em' }}>{label}</div>
+        <div style={{ marginTop:2, fontSize:'var(--text-sm)', color:'var(--text-strong)', fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{value}</div>
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -203,19 +228,36 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <Card title="Сводка">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <DetailField label="Заявка" value={o.id} mono />
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:12 }}>
+                <DetailField label="Заявка" value={o.id} mono />
+                <StatusBadge status={o.status || 'calc'} />
+              </div>
               <DetailField label="Заказчик" value={o.client} />
-              <DetailField label="Цель оценки" value={o.purpose} />
+              <DetailField label="Адрес" value={o.address} />
               <div style={{ height: 1, background: 'var(--divider)' }} />
               <div>
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-muted)' }}>Предв. рыночная стоимость</span>
-                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-value)', fontVariantNumeric: 'tabular-nums', marginTop: 6, letterSpacing: '-.01em' }}>{D.result.value} ₽</div>
+                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-value)', fontVariantNumeric: 'tabular-nums', marginTop: 6, letterSpacing: '-.01em' }}>{summaryValue} ₽</div>
+                <div style={{ marginTop:4, fontSize:'var(--text-xs)', color:'var(--text-muted)' }}>{savedCalculation.final ? 'из сохраненного расчета' : `диапазон ${D.result.low}–${D.result.high} ₽`}</div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                {summaryMetric('Тип', o.type, 'home')}
+                {summaryMetric('Площадь', o.area, 'ruler')}
+                {summaryMetric('Документы', String(docs.length), 'files')}
+                {summaryMetric('Фото', String(o.photos || 0), 'images')}
+              </div>
+              <div style={{ padding:'12px 14px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)' }}>
+                <div style={{ fontSize:'var(--text-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:6 }}>Цель оценки</div>
+                <div style={{ color:'var(--text-strong)', fontSize:'var(--text-sm)', lineHeight:1.45 }}>{o.purpose}</div>
               </div>
             </div>
           </Card>
           <Card title="Готовность к отчету">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <NS.ProgressBar label="Соответствие ФСО" value={80} />
+              <NS.ProgressBar label="Комплектность объекта" value={readiness} />
+              <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', lineHeight:1.45 }}>
+                Заполнено {completedFields} из {requiredFields.length} ключевых полей, документов: {docs.length}, фотографий: {o.photos || 0}.
+              </div>
               <Button variant="accent" block iconLeft={<Icon n="file-check" size={16} />} onClick={() => onNavigate('reports')}>Сформировать отчет</Button>
             </div>
           </Card>

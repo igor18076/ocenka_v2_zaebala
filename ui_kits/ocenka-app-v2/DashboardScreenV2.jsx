@@ -2,6 +2,14 @@
 window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigate }) {
   const { KpiCard, Card, Table, StatusBadge, Button, Avatar } = NS;
   const D = window.OcenkaData;
+  const requests = (() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('ocenka.requests.kanban.v1') || 'null');
+      return Array.isArray(saved) ? saved : (D.requests || []);
+    } catch {
+      return D.requests || [];
+    }
+  })();
 
   return (
     <div>
@@ -60,7 +68,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
               : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Avatar name={r.owner} size="sm" />{r.owner}</span> },
             { key: 'act', header: '', align: 'right', render: () => <span style={{ color: 'var(--text-subtle)' }}><Icon n="chevron-right" size={16} /></span> },
           ]}
-          rows={D.requests.slice(0, 5)} />
+          rows={requests.slice(0, 5)} />
       </Card>
     </div>
   );

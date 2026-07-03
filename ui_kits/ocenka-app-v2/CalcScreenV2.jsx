@@ -173,6 +173,12 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const vComp = compVal(), vInc = incVal(), vCst = cstVal();
   const wSum = roundWeight((applied.comp ? weights.comp : 0) + (applied.income ? weights.income : 0) + (applied.cost ? weights.cost : 0));
   const final = wSum ? Math.round(((applied.comp ? vComp*weights.comp : 0) + (applied.income ? vInc*weights.income : 0) + (applied.cost ? vCst*weights.cost : 0)) / wSum) : 0;
+  React.useEffect(() => {
+    if (loadedCalcId !== requestId) return;
+    try {
+      window.localStorage.setItem(calcStorageKey(requestId), JSON.stringify({ weights, applied, rows, inc, rentRows, cst, ncsTableIdx, final }));
+    } catch {}
+  }, [requestId, loadedCalcId, weights, applied, rows, inc, rentRows, cst, ncsTableIdx, final]);
   const exportCalculation = () => {
     const payload = {
       exportedAt: new Date().toISOString(),

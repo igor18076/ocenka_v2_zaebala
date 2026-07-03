@@ -3,7 +3,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const { Card, Button, Badge, ProgressBar } = NS;
   const D = window.OcenkaData;
   const selected = request || (D.requests || []).find((item) => item.id === D.object?.id) || {};
-  const o = {
+  const initialObject = {
     ...D.object,
     id: selected.id || D.object.id,
     title: selected.object || D.object.title,
@@ -12,13 +12,43 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     valueType: selected.type ? `${selected.type} стоимость` : D.object.valueType,
     date: selected.date || D.object.date,
   };
+  const savedObject = (() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(`ocenka.object.${initialObject.id}.v1`) || 'null') || {};
+    } catch {
+      return {};
+    }
+  })();
+  const o = { ...initialObject, ...savedObject };
   const reportSections = D.reportSections || [];
   const report = D.report || {};
-  const [reviewSent, setReviewSent] = React.useState(false);
+  const reviewStorageKey = `ocenka.report.review.${o.id}.v1`;
+  const [reviewSent, setReviewSent] = React.useState(() => {
+    try { return window.localStorage.getItem(reviewStorageKey) === '1'; } catch { return false; }
+  });
+  const [loadedReviewId, setLoadedReviewId] = React.useState(o.id);
   const calc = D.calculation || {};
-  const income = calc.income || {};
-  const rentRows = income.rentAnalogs || [];
   const fmt = (n) => Math.round(n || 0).toLocaleString('ru-RU');
+  const loadSavedCalculation = (id) => {
+    try {
+      return JSON.parse(window.localStorage.getItem(`ocenka.calculation.${id || 'draft'}.v1`) || 'null') || {};
+    } catch {
+      return {};
+    }
+  };
+  const savedCalc = loadSavedCalculation(o.id);
+  const weights = savedCalc.weights || calc.weights || { comp:60, income:10, cost:30 };
+  const applied = savedCalc.applied || calc.applied || { comp:true, income:true, cost:true };
+  const rows = savedCalc.rows || calc.comparableRows || [];
+  const income = savedCalc.inc || calc.income || {};
+  const rentRows = savedCalc.rentRows || income.rentAnalogs || [];
+  const cst = savedCalc.cst || calc.cost || {};
+  const subjectArea = calc.subjectArea || 214.6;
+  const compValue = rows.length ? Math.round(rows.reduce((sum, row) => {
+    const weightSum = rows.reduce((total, item) => total + (Number(item.w) || 0), 0) || 1;
+    const adj = 1 + ((row.adjTorg || 0) + (row.adjLoc || 0) + (row.adjRep || 0) + (row.adjFlr || 0)) / 100;
+    return sum + (row.price / row.area) * adj * ((Number(row.w) || 0) / weightSum);
+  }, 0) * subjectArea) : 0;
   const rentRate = rentRows.length ? Math.round(rentRows.reduce((sum, row) => {
     const weight = Number(row.weight) || 0;
     const adjusted = row.rentPerM2 * (1 + ((row.adjLoc || 0) + (row.adjCond || 0)) / 100);
@@ -28,12 +58,29 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const egi = Math.round(pgi * (1 - (income.vacancy || 0) / 100));
   const noi = Math.round(egi * (1 - (income.opex || 0) / 100));
   const incomeValue = Math.round(noi / ((income.cap || 1) / 100));
+  const costValue = Math.round((((cst.n || 0) * (cst.m || 0) * (cst.kPer || 1) * (cst.kReg || 1) * (cst.kZon || 1) * (cst.kSeis || 1) * (cst.kF || 1)) + (cst.zd || 0)) * (cst.kInd || 1) * (1 + (cst.vat || 0) / 100));
   const finalRows = [
-    { name:'Сравнительный подход', value:23200000, weight:calc.weights?.comp ?? 60 },
-    { name:'Доходный подход', value:incomeValue, weight:calc.weights?.income ?? 10 },
-    { name:'Затратный подход', value:28578000, weight:calc.weights?.cost ?? 30 },
-  ];
-  const finalValue = Math.round(finalRows.reduce((sum, row) => sum + row.value * row.weight, 0) / (finalRows.reduce((sum, row) => sum + row.weight, 0) || 1));
+    { key:'comp', name:'Сравнительный подход', value:compValue, weight:weights.comp ?? 60 },
+    { key:'income', name:'Доходный подход', value:incomeValue, weight:weights.income ?? 10 },
+    { key:'cost', name:'Затратный подход', value:costValue, weight:weights.cost ?? 30 },
+  ].filter((row) => applied[row.key] !== false);
+  const finalValue = savedCalc.final || Math.round(finalRows.reduce((sum, row) => sum + row.value * row.weight, 0) / (finalRows.reduce((sum, row) => sum + row.weight, 0) || 1));
+  const doneSections = reportSections.filter((section) => section.done).length;
+  const reportReady = Math.round((doneSections / (reportSections.length || 1)) * 100);
+  React.useEffect(() => {
+    try {
+      setReviewSent(window.localStorage.getItem(reviewStorageKey) === '1');
+    } catch {
+      setReviewSent(false);
+    }
+    setLoadedReviewId(o.id);
+  }, [o.id]);
+  React.useEffect(() => {
+    if (loadedReviewId !== o.id) return;
+    try {
+      window.localStorage.setItem(reviewStorageKey, reviewSent ? '1' : '0');
+    } catch {}
+  }, [reviewStorageKey, loadedReviewId, o.id, reviewSent]);
   const cell = { padding:'8px 10px', borderBottom:'1px solid var(--divider)', fontSize:'var(--text-sm)' };
   const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${o.id}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}</style></head><body><h1>Отчет об оценке №${o.id}</h1><p><b>Объект:</b> ${o.title}</p><p><b>Адрес:</b> ${o.address}</p><p><b>Заказчик:</b> ${o.client}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p><h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = (row.adjLoc || 0) + (row.adjCond || 0); const adjusted = Math.round(row.rentPerM2 * (1 + correction / 100)); return `<tr><td>${row.addr}</td><td class="num">${fmt(row.rentPerM2)}</td><td class="num">${correction}%</td><td class="num">${Number(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${row.name}</td><td class="num">${fmt(row.value)} ₽</td><td class="num">${Number(row.weight).toFixed(2)}%</td><td class="num">${fmt(row.value * row.weight / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
   const downloadDoc = () => {
@@ -112,7 +159,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
         {/* Composition checklist */}
         <Card title="Состав отчета">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <ProgressBar label="Готовность документа" value={80} />
+            <ProgressBar label="Готовность документа" value={reportReady} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginTop: 4 }}>
               {reportSections.map(({ label, done: ok }, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)' }}>
