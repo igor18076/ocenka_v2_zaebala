@@ -40,7 +40,9 @@ CREATE TABLE IF NOT EXISTS clients (
   name TEXT NOT NULL UNIQUE,
   kind TEXT NOT NULL,
   orders INTEGER NOT NULL DEFAULT 0,
-  contact TEXT NOT NULL
+  contact TEXT NOT NULL,
+  inn TEXT NOT NULL DEFAULT '0000000000',
+  legal_address TEXT NOT NULL DEFAULT 'Не указан'
 );
 
 CREATE TABLE IF NOT EXISTS requests (

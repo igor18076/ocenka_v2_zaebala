@@ -65,7 +65,7 @@ sudo ufw allow 4173/tcp
 Доступ по умолчанию:
 
 ```text
-login: igor
+login: ocenka
 password: ocenka123
 ```
 

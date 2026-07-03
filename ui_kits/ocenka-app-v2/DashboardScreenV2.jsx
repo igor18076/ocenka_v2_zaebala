@@ -22,7 +22,10 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
             отчет с учетом требований ФСО.
           </p>
           <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-            <Button variant="accent" iconLeft={<Icon n="plus" size={16} />} onClick={() => onNavigate('requests')}>Создать заявку</Button>
+            <Button variant="accent" iconLeft={<Icon n="plus" size={16} />} onClick={() => {
+              onNavigate('requests');
+              window.setTimeout(() => window.dispatchEvent(new Event('ocenka:create-request')), 0);
+            }}>Создать заявку</Button>
             <button onClick={() => onNavigate('fso')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.18)', borderRadius: 'var(--radius-md)', padding: '0 18px', height: 38, fontFamily: 'var(--font-sans)', fontSize: 'var(--text-base)', fontWeight: 600, cursor: 'pointer' }}>
               <Icon n="shield-check" size={16} /> Проверка ФСО
             </button>

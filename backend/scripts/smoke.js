@@ -49,7 +49,7 @@ async function main() {
   try {
     await waitForServer();
 
-    const loginBody = 'login=igor&password=ocenka123';
+    const loginBody = 'login=ocenka&password=ocenka123';
     const login = await request({
       path: '/login',
       method: 'POST',

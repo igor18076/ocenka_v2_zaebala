@@ -1,7 +1,8 @@
 /* ФСО compliance checklist with live progress. window.FsoScreen */
-window.FsoScreenV2 = function FsoScreenV2({ onNavigate, toast }) {
+window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
   const { Card, Button, ProgressBar, Badge } = NS;
   const [items, setItems] = React.useState(window.OcenkaData.fso.map((x) => ({ ...x })));
+  const requestId = request?.id || window.OcenkaData.object?.id;
 
   const done = items.filter((i) => i.done).length;
   const pct = Math.round((done / items.length) * 100);
@@ -13,7 +14,7 @@ window.FsoScreenV2 = function FsoScreenV2({ onNavigate, toast }) {
 
   return (
     <div>
-      <PageHead title="Проверка ФСО" subtitle="Соответствие отчета федеральным стандартам оценки"
+      <PageHead title="Проверка ФСО" subtitle={`Заявка ${requestId} · соответствие отчета федеральным стандартам оценки`}
         actions={<Button variant="primary" iconLeft={<Icon n="refresh-cw" size={16} />} onClick={recheck}>Перепроверить</Button>} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 20, alignItems: 'start' }}>

@@ -1,26 +1,38 @@
 /* Calculation screen — three sub-tabs + live right sidebar. window.CalcScreen */
-window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
+window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const { Button, Badge } = NS;
   const D = window.OcenkaData;
   const calc = D.calculation || {};
+  const requestId = request?.id || D.object?.id;
+  const requestTitle = request?.object || D.object?.title || 'Объект оценки';
+  const calcStorageKey = (id) => `ocenka.calculation.${id || 'draft'}.v1`;
+  const loadSavedCalculation = (id) => {
+    try {
+      return JSON.parse(window.localStorage.getItem(calcStorageKey(id)) || 'null') || {};
+    } catch {
+      return {};
+    }
+  };
+  const savedCalc = loadSavedCalculation(requestId);
+  const [loadedCalcId, setLoadedCalcId] = React.useState(requestId);
 
   const [tab, setTab]       = React.useState('comp');
-  const [weights, setWt]    = React.useState(calc.weights || { comp:60, income:10, cost:30 });
-  const [applied, setApp]   = React.useState(calc.applied || { comp:true, income:true, cost:true });
+  const [weights, setWt]    = React.useState(savedCalc.weights || calc.weights || { comp:60, income:10, cost:30 });
+  const [applied, setApp]   = React.useState(savedCalc.applied || calc.applied || { comp:true, income:true, cost:true });
   const APPROACH_KEYS = ['comp', 'income', 'cost'];
+  const roundWeight = (value) => Math.round(Math.max(0, Math.min(100, Number(value) || 0)) * 100) / 100;
 
   const distributeWeights = (remaining, keys, baseWeights) => {
     if (!keys.length) return {};
     const total = keys.reduce((sum, key) => sum + Math.max(0, baseWeights[key] || 0), 0);
-    const raw = keys.map((key) => {
+    const values = {};
+    keys.forEach((key) => {
       const share = total > 0 ? remaining * Math.max(0, baseWeights[key] || 0) / total : remaining / keys.length;
-      return { key, floor: Math.floor(share), frac: share - Math.floor(share) };
+      values[key] = roundWeight(share);
     });
-    let rest = remaining - raw.reduce((sum, item) => sum + item.floor, 0);
-    raw.sort((a, b) => b.frac - a.frac).forEach((item) => {
-      if (rest > 0) { item.floor += 1; rest -= 1; }
-    });
-    return raw.reduce((acc, item) => ({ ...acc, [item.key]: item.floor }), {});
+    const drift = roundWeight(remaining - keys.reduce((sum, key) => sum + values[key], 0));
+    values[keys[keys.length - 1]] = roundWeight((values[keys[keys.length - 1]] || 0) + drift);
+    return values;
   };
 
   const setWeightLinked = (key, nextValue, nextApplied = applied) => {
@@ -30,7 +42,7 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
       return;
     }
 
-    const value = Math.max(0, Math.min(100, Math.round(nextValue)));
+    const value = roundWeight(nextValue);
     const otherKeys = activeKeys.filter((k) => k !== key);
     const distributed = distributeWeights(100 - value, otherKeys, weights);
     setWt((current) => ({
@@ -50,7 +62,7 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
 
     setApp(nextApplied);
     if (checked) {
-      const target = weights[key] > 0 ? weights[key] : Math.round(100 / activeKeys.length);
+      const target = weights[key] > 0 ? weights[key] : roundWeight(100 / activeKeys.length);
       setWeightLinked(key, target, nextApplied);
       return;
     }
@@ -61,11 +73,21 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
 
   /* ── Сравнительный ─────────────────────────────────── */
   const subjectArea = calc.subjectArea || 214.6;
-  const [rows, setRows] = React.useState(calc.comparableRows || []);
+  const [rows, setRows] = React.useState(savedCalc.rows || calc.comparableRows || []);
   const updRow = (id, f, v) => setRows(rs => rs.map(r => r.id === id ? { ...r, [f]: v } : r));
 
   /* ── Доходный ───────────────────────────────────────── */
-  const [inc, setInc] = React.useState(calc.income || { area:214.6, rent:800, vacancy:12, opex:35, cap:9 });
+  const [inc, setInc] = React.useState(savedCalc.inc || calc.income || { area:214.6, rent:800, vacancy:12, opex:35, cap:9 });
+  const [rentRows, setRentRows] = React.useState(savedCalc.rentRows || calc.income?.rentAnalogs || []);
+  const updRentRow = (id, f, v) => setRentRows(rs => rs.map(r => r.id === id ? { ...r, [f]: v } : r));
+  const rentSources = calc.income?.sources || [];
+  const rentAnalogRate = () => {
+    const totalWeight = rentRows.reduce((sum, row) => sum + (parseFloat(row.weight) || 0), 0) || 1;
+    return Math.round(rentRows.reduce((sum, row) => {
+      const adjusted = row.rentPerM2 * (1 + ((row.adjLoc || 0) + (row.adjCond || 0)) / 100);
+      return sum + adjusted * ((parseFloat(row.weight) || 0) / totalWeight);
+    }, 0));
+  };
 
   /* ── Затратный ──────────────────────────────────────── */
   const defaultCost = { n:95000, m:214.6, kPer:1, kReg:1, kZon:1, kSeis:1, kF:1, zd:0, kInd:1, vat:20, rateCode:'01-02-001-01' };
@@ -73,11 +95,12 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
   const [cst, setCst] = React.useState({
     ...defaultCost,
     ...seedCost,
-    n: seedCost.n ?? seedCost.replaceM2 ?? defaultCost.n,
-    m: seedCost.m ?? seedCost.area ?? defaultCost.m,
+    ...(savedCalc.cst || {}),
+    n: savedCalc.cst?.n ?? seedCost.n ?? seedCost.replaceM2 ?? defaultCost.n,
+    m: savedCalc.cst?.m ?? seedCost.m ?? seedCost.area ?? defaultCost.m,
   });
   const ncsTables = cst.ncsTables || [];
-  const [ncsTableIdx, setNcsTableIdx] = React.useState(0);
+  const [ncsTableIdx, setNcsTableIdx] = React.useState(savedCalc.ncsTableIdx || 0);
   const parseNcsNumber = (raw) => {
     const normalized = String(raw ?? '')
       .replace(/\s+/g, '')
@@ -104,6 +127,29 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
     setCst((prev) => ({ ...prev, ...next }));
   };
   const ncsTargetLabel = { n:'N', kPer:'Kper', kZon:'Kzon', kReg:'Kreg', kSeis:'Kseis', kF:'Kf' };
+  React.useEffect(() => {
+    const saved = loadSavedCalculation(requestId);
+    setWt(saved.weights || calc.weights || { comp:60, income:10, cost:30 });
+    setApp(saved.applied || calc.applied || { comp:true, income:true, cost:true });
+    setRows(saved.rows || calc.comparableRows || []);
+    setInc(saved.inc || calc.income || { area:214.6, rent:800, vacancy:12, opex:35, cap:9 });
+    setRentRows(saved.rentRows || calc.income?.rentAnalogs || []);
+    setCst({
+      ...defaultCost,
+      ...seedCost,
+      ...(saved.cst || {}),
+      n: saved.cst?.n ?? seedCost.n ?? seedCost.replaceM2 ?? defaultCost.n,
+      m: saved.cst?.m ?? seedCost.m ?? seedCost.area ?? defaultCost.m,
+    });
+    setNcsTableIdx(saved.ncsTableIdx || 0);
+    setLoadedCalcId(requestId);
+  }, [requestId]);
+  React.useEffect(() => {
+    if (loadedCalcId !== requestId) return;
+    try {
+      window.localStorage.setItem(calcStorageKey(requestId), JSON.stringify({ weights, applied, rows, inc, rentRows, cst, ncsTableIdx }));
+    } catch {}
+  }, [requestId, loadedCalcId, weights, applied, rows, inc, rentRows, cst, ncsTableIdx]);
 
   /* ── Расчёты ─────────────────────────────────────────── */
   const fmt = n => Math.round(n).toLocaleString('ru');
@@ -125,7 +171,7 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
     return Math.round((base + cst.zd) * cst.kInd * (1 + cst.vat / 100));
   }
   const vComp = compVal(), vInc = incVal(), vCst = cstVal();
-  const wSum = (applied.comp ? weights.comp : 0) + (applied.income ? weights.income : 0) + (applied.cost ? weights.cost : 0);
+  const wSum = roundWeight((applied.comp ? weights.comp : 0) + (applied.income ? weights.income : 0) + (applied.cost ? weights.cost : 0));
   const final = wSum ? Math.round(((applied.comp ? vComp*weights.comp : 0) + (applied.income ? vInc*weights.income : 0) + (applied.cost ? vCst*weights.cost : 0)) / wSum) : 0;
   const exportCalculation = () => {
     const payload = {
@@ -134,7 +180,7 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
       weights,
       applied,
       comparative: { value: vComp, rows },
-      income: { value: vInc, params: inc },
+      income: { value: vInc, params: inc, rentAnalogs: rentRows },
       cost: { value: vCst, params: cst },
       final,
     };
@@ -309,6 +355,50 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
             ))}
           </div>
         </div>
+        {rentRows.length ? (
+          <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
+            <div style={{ padding:'13px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', gap:12, alignItems:'center' }}>
+              <div>
+                <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Таблица 6 · Подбор аналогов по аренде за 1 м²</div>
+                <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>Весовой коэффициент указан в долях, например 0,001</div>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => { setInc((p) => ({ ...p, rent: rentAnalogRate() })); if (toast) toast('Арендная ставка применена'); }}>Применить ставку {fmt(rentAnalogRate())} ₽/м²</Button>
+            </div>
+            <div style={{ overflowX:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead><tr><TH ch="Аналог"/><TH ch="Источник"/><TH ch="Ставка, ₽/м²" r/><TH ch="Площадь" r/><TH ch="Локация %" r/><TH ch="Состояние %" r/><TH ch="Вес" r/><TH ch="Скорр. ставка" r/></tr></thead>
+                <tbody>
+                  {rentRows.map((row) => {
+                    const adjusted = Math.round(row.rentPerM2 * (1 + ((row.adjLoc || 0) + (row.adjCond || 0)) / 100));
+                    return (
+                      <tr key={row.id}>
+                        <TD ch={<><b style={{color:'var(--text-strong)'}}>{row.addr}</b><br/><span className="ds-mono" style={{fontSize:11,color:'var(--text-muted)'}}>{row.id}</span></>} />
+                        <TD ch={row.source} />
+                        <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--divider)' }}>{numInp(row.rentPerM2, v=>updRentRow(row.id,'rentPerM2',v), 92)}</td>
+                        <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--divider)' }}>{numInp(row.area, v=>updRentRow(row.id,'area',v), 72)}</td>
+                        <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--divider)' }}>{numInp(row.adjLoc, v=>updRentRow(row.id,'adjLoc',v), 72)}</td>
+                        <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--divider)' }}>{numInp(row.adjCond, v=>updRentRow(row.id,'adjCond',v), 88)}</td>
+                        <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--divider)' }}>{numInp(row.weight, v=>updRentRow(row.id,'weight',v), 76)}</td>
+                        <TD ch={`${fmt(adjusted)} ₽/м²`} r bold />
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding:'14px 20px', background:'var(--surface-inset)', borderTop:'1px solid var(--divider)' }}>
+              <div style={{ fontSize:'var(--text-sm)', fontWeight:700, color:'var(--text-strong)', marginBottom:8 }}>Формулы и источники</div>
+              <div style={{ display:'grid', gap:6 }}>
+                {rentSources.map((source, index) => (
+                  <div key={index} style={{ display:'flex', gap:8, color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.45 }}>
+                    <span className="ds-mono" style={{ color:'var(--text-subtle)' }}>{index + 1}.</span>
+                    <span>{source}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div style={{ background:'var(--emerald-50)', border:'1.5px solid var(--emerald-300)', borderRadius:'var(--radius-lg)', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontWeight:600, color:'var(--emerald-700)' }}>Стоимость по доходному подходу</div>
@@ -462,14 +552,39 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
                 <input type="checkbox" checked={applied[k]} onChange={e=>setAppliedLinked(k, e.target.checked)} />
                 {l}
               </label>
-              <span style={{ fontSize:'var(--text-sm)', fontWeight:700, color:applied[k]?col:'var(--text-subtle)', minWidth:34, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{weights[k]}%</span>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={Number(weights[k]).toFixed(2)}
+                  disabled={!applied[k]}
+                  onChange={e=>setWeightLinked(k, parseFloat(e.target.value))}
+                  style={{
+                    width:64,
+                    height:24,
+                    border:'1px solid var(--border-default)',
+                    borderRadius:'var(--radius-sm)',
+                    padding:'0 6px',
+                    textAlign:'right',
+                    fontFamily:'var(--font-mono)',
+                    fontSize:'var(--text-xs)',
+                    fontWeight:700,
+                    color:applied[k]?col:'var(--text-subtle)',
+                    background:applied[k]?'var(--surface-card)':'var(--surface-inset)',
+                    boxSizing:'border-box',
+                  }}
+                />
+                <span style={{ fontSize:'var(--text-xs)', fontWeight:700, color:applied[k]?col:'var(--text-subtle)' }}>%</span>
+              </span>
             </div>
-            <input type="range" min={0} max={100} value={weights[k]} disabled={!applied[k]}
-              onChange={e=>setWeightLinked(k, parseInt(e.target.value, 10))}
+            <input type="range" min={0} max={100} step={0.01} value={weights[k]} disabled={!applied[k]}
+              onChange={e=>setWeightLinked(k, parseFloat(e.target.value))}
               style={{ width:'100%', accentColor:col }} />
           </div>
         ))}
-        <div style={{ textAlign:'right', fontSize:'var(--text-xs)', fontWeight:600, color: wSum===100?'var(--success-text)':'var(--danger-text)', marginTop:2 }}>Сумма: {wSum}%</div>
+        <div style={{ textAlign:'right', fontSize:'var(--text-xs)', fontWeight:600, color: Math.abs(wSum-100)<0.01?'var(--success-text)':'var(--danger-text)', marginTop:2 }}>Сумма: {wSum.toFixed(2)}%</div>
       </div>
 
       {/* Approaches */}
@@ -494,7 +609,7 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
       <div className="ock-card" style={{ padding:'14px 18px' }}>
         <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:10 }}>Экспорт</div>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          <Button variant="secondary" block iconLeft={<Icon n="file-text" size={15} />} onClick={() => onNavigate('reports')}>Скачать DOCX</Button>
+          <Button variant="secondary" block iconLeft={<Icon n="file-text" size={15} />} onClick={() => onNavigate('reports')}>Скачать DOC</Button>
           <Button variant="ghost"     block iconLeft={<Icon n="braces"    size={15} />} onClick={exportCalculation}>Экспорт JSON</Button>
         </div>
       </div>
@@ -521,7 +636,7 @@ window.CalcScreenV2 = function CalcScreenV2({ onNavigate, toast }) {
 
   return (
     <div>
-      <PageHead title="Расчет стоимости" subtitle="Объект ОЗ-1040 · три подхода к оценке, живой пересчёт" />
+      <PageHead title="Расчет стоимости" subtitle={`Заявка ${requestId} · ${requestTitle} · три подхода к оценке, живой пересчет`} />
 
       {/* Sub-tabs */}
       <div style={{ display:'flex', gap:2, background:'var(--surface-inset)', padding:4, borderRadius:'var(--radius-lg)', marginBottom:20, width:'fit-content' }}>

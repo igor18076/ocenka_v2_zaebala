@@ -57,7 +57,13 @@ window.SidebarV2 = function SidebarV2({ active, onNavigate }) {
       </nav>
 
       {/* Footer help */}
-      <div style={{ padding: 16, margin: 12, borderRadius: 'var(--radius-lg)', background: 'var(--surface-sidebar-hover)' }}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onNavigate('fso')}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onNavigate('fso'); }}
+        style={{ padding: 16, margin: 12, borderRadius: 'var(--radius-lg)', background: 'var(--surface-sidebar-hover)', cursor:'pointer' }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
           <Icon n="life-buoy" size={16} /> Поддержка ФСО
         </div>

@@ -3,6 +3,7 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
   const { Button, IconButton, Avatar } = NS;
   const D = window.OcenkaData;
   const [query, setQuery] = React.useState('');
+  const [menu, setMenu] = React.useState(null);
 
   const runSearch = () => {
     const value = query.trim();
@@ -12,6 +13,19 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
       window.dispatchEvent(new CustomEvent('ocenka:request-search', { detail: value }));
     }, 0);
   };
+  const panel = {
+    position:'absolute',
+    top:'calc(var(--topbar-height) - 4px)',
+    right:24,
+    width:300,
+    zIndex:80,
+    background:'var(--surface-card)',
+    border:'1px solid var(--border-subtle)',
+    borderRadius:'var(--radius-lg)',
+    boxShadow:'var(--shadow-lg)',
+    padding:12,
+  };
+  const panelItem = { padding:'10px 12px', borderRadius:'var(--radius-md)', background:'var(--surface-inset)', marginBottom:8 };
 
   return (
     <header style={{
@@ -47,13 +61,13 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
       <Button variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={onNewAppraisal}>Новая оценка</Button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <IconButton aria-label="Уведомления"><Icon n="bell" size={18} /></IconButton>
-        <IconButton aria-label="Помощь"><Icon n="circle-help" size={18} /></IconButton>
+        <IconButton aria-label="Уведомления" onClick={() => setMenu(menu === 'notifications' ? null : 'notifications')}><Icon n="bell" size={18} /></IconButton>
+        <IconButton aria-label="Помощь" onClick={() => setMenu(menu === 'help' ? null : 'help')}><Icon n="circle-help" size={18} /></IconButton>
       </div>
 
       <div style={{ width: 1, height: 28, background: 'var(--divider)' }} />
 
-      <button style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 'var(--radius-md)' }}>
+      <button onClick={() => setMenu(menu === 'profile' ? null : 'profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 'var(--radius-md)' }}>
         <Avatar name={D.user.name} />
         <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
           <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)' }}>{D.user.name}</div>
@@ -61,6 +75,47 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
         </div>
         <Icon n="chevron-down" size={16} style={{ color: 'var(--text-muted)' }} />
       </button>
+      {menu ? (
+        <div style={panel}>
+          {menu === 'notifications' ? (
+            <React.Fragment>
+              <div style={{ fontWeight:800, color:'var(--text-strong)', margin:'2px 4px 10px' }}>Уведомления</div>
+              {[
+                ['ФСО', 'В отчете есть 2 незавершенных пункта проверки.'],
+                ['Заявки', 'Новая заявка будет создана через кнопку в шапке.'],
+              ].map(([title, text]) => (
+                <div key={title} style={panelItem}>
+                  <div style={{ fontWeight:700, color:'var(--text-strong)', fontSize:'var(--text-sm)' }}>{title}</div>
+                  <div style={{ marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.4 }}>{text}</div>
+                </div>
+              ))}
+            </React.Fragment>
+          ) : null}
+          {menu === 'help' ? (
+            <React.Fragment>
+              <div style={{ fontWeight:800, color:'var(--text-strong)', margin:'2px 4px 10px' }}>Помощь</div>
+              <div style={panelItem}>Enter в поиске открывает заявки и применяет фильтр.</div>
+              <div style={panelItem}>Карточки заявок можно перетаскивать между колонками.</div>
+              <Button variant="secondary" block onClick={() => { setMenu(null); window.ocenkaGoTo && window.ocenkaGoTo('fso'); }}>Открыть проверку ФСО</Button>
+            </React.Fragment>
+          ) : null}
+          {menu === 'profile' ? (
+            <React.Fragment>
+              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 4px 12px' }}>
+                <Avatar name={D.user.name} />
+                <div>
+                  <div style={{ fontWeight:800, color:'var(--text-strong)' }}>{D.user.name}</div>
+                  <div style={{ color:'var(--text-muted)', fontSize:'var(--text-xs)' }}>{D.user.role}</div>
+                </div>
+              </div>
+              <Button variant="secondary" block onClick={() => { setMenu(null); window.ocenkaGoTo && window.ocenkaGoTo('settings'); }}>Настройки профиля</Button>
+              <form method="post" action="/logout" style={{ marginTop:8 }}>
+                <Button variant="ghost" block iconLeft={<Icon n="log-out" size={15} />}>Выйти</Button>
+              </form>
+            </React.Fragment>
+          ) : null}
+        </div>
+      ) : null}
     </header>
   );
 };

@@ -1,14 +1,68 @@
 /* Report generation. window.ReportScreen */
-window.ReportScreenV2 = function ReportScreenV2({ toast }) {
+window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const { Card, Button, Badge, ProgressBar } = NS;
   const D = window.OcenkaData;
-  const o = D.object;
+  const selected = request || (D.requests || []).find((item) => item.id === D.object?.id) || {};
+  const o = {
+    ...D.object,
+    id: selected.id || D.object.id,
+    title: selected.object || D.object.title,
+    address: selected.address || D.object.address,
+    client: selected.client || D.object.client,
+    valueType: selected.type ? `${selected.type} стоимость` : D.object.valueType,
+    date: selected.date || D.object.date,
+  };
   const reportSections = D.reportSections || [];
   const report = D.report || {};
+  const [reviewSent, setReviewSent] = React.useState(false);
+  const calc = D.calculation || {};
+  const income = calc.income || {};
+  const rentRows = income.rentAnalogs || [];
+  const fmt = (n) => Math.round(n || 0).toLocaleString('ru-RU');
+  const rentRate = rentRows.length ? Math.round(rentRows.reduce((sum, row) => {
+    const weight = Number(row.weight) || 0;
+    const adjusted = row.rentPerM2 * (1 + ((row.adjLoc || 0) + (row.adjCond || 0)) / 100);
+    return sum + adjusted * weight;
+  }, 0) / (rentRows.reduce((sum, row) => sum + (Number(row.weight) || 0), 0) || 1)) : income.rent;
+  const pgi = Math.round((income.area || 0) * (rentRate || 0) * 12);
+  const egi = Math.round(pgi * (1 - (income.vacancy || 0) / 100));
+  const noi = Math.round(egi * (1 - (income.opex || 0) / 100));
+  const incomeValue = Math.round(noi / ((income.cap || 1) / 100));
+  const finalRows = [
+    { name:'Сравнительный подход', value:23200000, weight:calc.weights?.comp ?? 60 },
+    { name:'Доходный подход', value:incomeValue, weight:calc.weights?.income ?? 10 },
+    { name:'Затратный подход', value:28578000, weight:calc.weights?.cost ?? 30 },
+  ];
+  const finalValue = Math.round(finalRows.reduce((sum, row) => sum + row.value * row.weight, 0) / (finalRows.reduce((sum, row) => sum + row.weight, 0) || 1));
+  const cell = { padding:'8px 10px', borderBottom:'1px solid var(--divider)', fontSize:'var(--text-sm)' };
+  const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${o.id}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}</style></head><body><h1>Отчет об оценке №${o.id}</h1><p><b>Объект:</b> ${o.title}</p><p><b>Адрес:</b> ${o.address}</p><p><b>Заказчик:</b> ${o.client}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p><h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = (row.adjLoc || 0) + (row.adjCond || 0); const adjusted = Math.round(row.rentPerM2 * (1 + correction / 100)); return `<tr><td>${row.addr}</td><td class="num">${fmt(row.rentPerM2)}</td><td class="num">${correction}%</td><td class="num">${Number(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${row.name}</td><td class="num">${fmt(row.value)} ₽</td><td class="num">${Number(row.weight).toFixed(2)}%</td><td class="num">${fmt(row.value * row.weight / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
+  const downloadDoc = () => {
+    const blob = new Blob([reportHtml()], { type:'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `report-${o.id}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast('Файл DOC сформирован и загружается');
+  };
+  const openPdfPrint = () => {
+    const win = window.open('', '_blank');
+    if (!win) {
+      toast('Разрешите всплывающие окна для печати PDF');
+      return;
+    }
+    win.document.write(reportHtml());
+    win.document.close();
+    win.focus();
+    win.print();
+  };
 
   return (
     <div>
-      <PageHead title="Отчет об оценке" subtitle="Формирование итогового документа об оценке" />
+      <PageHead title="Отчет об оценке" subtitle={`Заявка ${o.id} · отчет №${o.id}`} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, alignItems: 'start' }}>
         {/* Report preview card */}
@@ -29,26 +83,27 @@ window.ReportScreenV2 = function ReportScreenV2({ toast }) {
             </div>
 
             <div style={{ flex: 1 }}>
-              <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-strong)' }}>Отчет об оценке квартиры №{o.id}</h3>
+              <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text-strong)' }}>Отчет №{o.id} · {o.title}</h3>
               <p style={{ color: 'var(--text-muted)', marginTop: 6, fontSize: 'var(--text-sm)' }}>{o.address}</p>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                <Badge tone="brand">DOCX</Badge>
+                <Badge tone="brand">DOC</Badge>
                 <Badge tone="info">PDF</Badge>
-                <Badge tone="success" pill dot>Готов к формированию</Badge>
+                <Badge tone={reviewSent ? 'warning' : 'success'} pill dot={!reviewSent}>{reviewSent ? 'На проверке' : 'Готов к формированию'}</Badge>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px', marginTop: 20 }}>
                 <DetailField label="Вид стоимости" value={o.valueType} />
-                <DetailField label="Итоговая стоимость" value={`${D.result.value} ₽`} />
+                <DetailField label="Итоговая стоимость" value={`${fmt(finalValue)} ₽`} />
                 <DetailField label="Дата оценки" value={o.date} />
+                <DetailField label="Номер заявки" value={o.id} mono />
                 <DetailField label="Объем отчета" value={`≈ ${report.pageCount} страниц`} />
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
-                <Button variant="primary" iconLeft={<Icon n="file-text" size={16} />} onClick={() => toast('Файл DOCX сформирован и загружается')}>Скачать DOCX</Button>
-                <Button variant="secondary" iconLeft={<Icon n="file-down" size={16} />} onClick={() => toast('Файл PDF сформирован и загружается')}>Скачать PDF</Button>
-                <Button variant="ghost" iconLeft={<Icon n="send" size={16} />} onClick={() => toast('Отчет отправлен на проверку')}>Отправить на проверку</Button>
+                <Button variant="primary" iconLeft={<Icon n="file-text" size={16} />} onClick={downloadDoc}>Скачать DOC</Button>
+                <Button variant="secondary" iconLeft={<Icon n="file-down" size={16} />} onClick={openPdfPrint}>Скачать PDF</Button>
+                <Button variant="ghost" iconLeft={<Icon n="send" size={16} />} onClick={() => { setReviewSent(true); toast('Отчет отправлен на проверку'); }}>Отправить на проверку</Button>
               </div>
             </div>
           </div>
@@ -68,6 +123,62 @@ window.ReportScreenV2 = function ReportScreenV2({ toast }) {
                 </div>
               ))}
             </div>
+          </div>
+        </Card>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginTop:20, alignItems:'start' }}>
+        <Card title="Таблица 6 · Расчет доходным методом">
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr>
+                  {['Аналог', 'Ставка', 'Корр.', 'Вес', 'Скорр. ставка'].map((h) => <th key={h} style={{ ...cell, color:'var(--text-muted)', textAlign:h==='Аналог'?'left':'right', fontWeight:700 }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {rentRows.map((row) => {
+                  const correction = (row.adjLoc || 0) + (row.adjCond || 0);
+                  const adjusted = Math.round(row.rentPerM2 * (1 + correction / 100));
+                  return (
+                    <tr key={row.id}>
+                      <td style={cell}>{row.addr}</td>
+                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmt(row.rentPerM2)}</td>
+                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{correction}%</td>
+                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Number(row.weight).toFixed(3)}</td>
+                      <td style={{ ...cell, textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmt(adjusted)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop:12, padding:'10px 12px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)', color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.5 }}>
+            R = Σ(Ri × Ki × Wi) / ΣWi. PGI = S × R × 12; EGI = PGI × (1 - недозагрузка); NOI = EGI × (1 - операционные расходы). Источники: открытые объявления и справочники корректировок оценщика недвижимости.
+          </div>
+        </Card>
+        <Card title="Таблица 8 · Финальный расчет">
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr>
+                  {['Подход', 'Стоимость', 'Вес', 'Вклад'].map((h) => <th key={h} style={{ ...cell, color:'var(--text-muted)', textAlign:h==='Подход'?'left':'right', fontWeight:700 }}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {finalRows.map((row) => (
+                  <tr key={row.name}>
+                    <td style={cell}>{row.name}</td>
+                    <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmt(row.value)} ₽</td>
+                    <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Number(row.weight).toFixed(2)}%</td>
+                    <td style={{ ...cell, textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmt(row.value * row.weight / 100)} ₽</td>
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ ...cell, fontWeight:800, color:'var(--text-strong)' }}>Итого</td>
+                  <td colSpan="3" style={{ ...cell, textAlign:'right', fontWeight:800, color:'var(--text-value)', fontVariantNumeric:'tabular-nums' }}>{fmt(finalValue)} ₽</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </Card>
       </div>

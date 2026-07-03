@@ -45,6 +45,7 @@
     function App() {
       const [active, setActive] = React.useState('dashboard');
       const [toastMsg, setToastMsg] = React.useState(null);
+      const [selectedRequest, setSelectedRequest] = React.useState(() => (window.OcenkaData.requests || []).find((request) => request.id === window.OcenkaData.object?.id) || (window.OcenkaData.requests || [])[0] || null);
       const contentRef = React.useRef(null);
 
       const toast = (msg) => {
@@ -57,7 +58,10 @@
         setActive(key);
         if (contentRef.current) contentRef.current.scrollTop = 0;
       };
-      const openRequest = () => navigate('objects');
+      const openRequest = (request) => {
+        if (request) setSelectedRequest(request);
+        navigate('objects');
+      };
 
       React.useEffect(() => {
         window.ocenkaGoTo = (key) => {
@@ -71,12 +75,12 @@
       const screens = {
         dashboard: <DashboardScreenV2 onOpenRequest={openRequest} onNavigate={navigate} />,
         requests:  <RequestsScreenV2 onOpenRequest={openRequest} />,
-        objects:   <ObjectScreenV2 onBack={() => navigate('requests')} onNavigate={navigate} toast={toast} />,
-        analogs:   <AnalogsScreenV2 onNavigate={navigate} toast={toast} />,
-        calc:      <CalcScreenV2 onNavigate={navigate} toast={toast} />,
-        reports:   <ReportScreenV2 toast={toast} />,
-        fso:       <FsoScreenV2 onNavigate={navigate} toast={toast} />,
-        analytics: <AnalyticsScreen />,
+        objects:   <ObjectScreenV2 request={selectedRequest} onBack={() => navigate('requests')} onNavigate={navigate} toast={toast} />,
+        analogs:   <AnalogsScreenV2 request={selectedRequest} onNavigate={navigate} toast={toast} />,
+        calc:      <CalcScreenV2 request={selectedRequest} onNavigate={navigate} toast={toast} />,
+        reports:   <ReportScreenV2 request={selectedRequest} toast={toast} />,
+        fso:       <FsoScreenV2 request={selectedRequest} onNavigate={navigate} toast={toast} />,
+        analytics: <AnalyticsScreen toast={toast} />,
         clients:   <ClientsScreenV2 toast={toast} />,
         settings:  <SettingsScreenV2 toast={toast} />,
       };

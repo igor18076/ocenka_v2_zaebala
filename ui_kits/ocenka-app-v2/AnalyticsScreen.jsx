@@ -95,12 +95,16 @@ function avgByYear(items, valFn) {
 }
 
 /* ── Main screen ─────────────────────────────────────────────────────────── */
-window.AnalyticsScreen = function AnalyticsScreen() {
+window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
   const D = window.OcenkaData;
   const all = D.analyticsProps || [];
 
   const [filt, setFilt] = React.useState({ useType:'all', cls:'all', era:'all', line:'all', propType:'all' });
   const set = (k,v) => setFilt(f=>({...f,[k]:v}));
+  const resetFilters = () => {
+    setFilt({ useType:'all', cls:'all', era:'all', line:'all', propType:'all' });
+    if (toast) toast('Фильтры аналитики сброшены');
+  };
 
   const filtered = all.filter(p =>
     (filt.useType  === 'all' || p.useType  === filt.useType) &&
@@ -156,6 +160,34 @@ window.AnalyticsScreen = function AnalyticsScreen() {
     .map(String);
   const priceDynamics = yearLabels.map(year => priceByYear[year] ? fmt1000(priceByYear[year]) : null);
   const rentDynamics = yearLabels.map(year => rentByYear[year] ? fmt1000(rentByYear[year]) : null);
+  const exportCsv = () => {
+    const headers = ['id','address','type','class','district','area','pricePerM2','rentPerM2','year','condition'];
+    const lines = [
+      headers.join(';'),
+      ...filtered.map((p) => [
+        p.id,
+        p.addr,
+        p.type,
+        p.class,
+        p.district,
+        p.area,
+        p.pricePerM2,
+        p.rentPerM2 || '',
+        p.year,
+        p.cond,
+      ].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';')),
+    ];
+    const blob = new Blob(['\ufeff' + lines.join('\n')], { type:'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'market-analytics.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    if (toast) toast('Выгрузка аналитики сформирована');
+  };
 
   /* Filter pill */
   const FilterPill = ({ label, value, options }) => (
@@ -176,7 +208,11 @@ window.AnalyticsScreen = function AnalyticsScreen() {
 
   return (
     <div>
-      <PageHead title="Аналитика рынка" subtitle={`${all.length} объектов в базе · ${n} в выборке · данные из аналогов и объектов оценки`} />
+      <PageHead title="Аналитика рынка" subtitle={`${all.length} объектов в базе · ${n} в выборке · данные из аналогов и объектов оценки`}
+        actions={[
+          <NS.Button key="reset" variant="secondary" iconLeft={<Icon n="rotate-ccw" size={16} />} onClick={resetFilters}>Сбросить</NS.Button>,
+          <NS.Button key="export" variant="primary" iconLeft={<Icon n="download" size={16} />} onClick={exportCsv}>Экспорт CSV</NS.Button>,
+        ]} />
 
       {/* Filters */}
       <div className="ock-card" style={{ padding:'14px 20px', marginBottom:20, display:'flex', flexWrap:'wrap', gap:16 }}>

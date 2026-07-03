@@ -15,6 +15,13 @@ fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 const db = new DatabaseSync(dbPath);
 db.exec(fs.readFileSync(schemaPath, 'utf8'));
+const clientColumns = new Set(db.prepare('PRAGMA table_info(clients)').all().map((column) => column.name));
+if (!clientColumns.has('inn')) {
+  db.exec("ALTER TABLE clients ADD COLUMN inn TEXT NOT NULL DEFAULT '0000000000'");
+}
+if (!clientColumns.has('legal_address')) {
+  db.exec("ALTER TABLE clients ADD COLUMN legal_address TEXT NOT NULL DEFAULT 'Не указан'");
+}
 
 const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 const ncsTables = JSON.parse(fs.readFileSync(ncsTablesPath, 'utf8'));
@@ -76,9 +83,16 @@ try {
   );
 
   runMany(
-    'INSERT INTO clients (name, kind, orders, contact) VALUES (?, ?, ?, ?)',
+    'INSERT INTO clients (name, kind, orders, contact, inn, legal_address) VALUES (?, ?, ?, ?, ?, ?)',
     seed.clients,
-    (item) => [item.name, item.kind, item.orders, item.contact]
+    (item, index) => [
+      item.name,
+      item.kind,
+      item.orders,
+      item.contact,
+      item.inn || String(index + 1).repeat(10).slice(0, 10),
+      item.legalAddress || item.legal_address || 'Юридический адрес не указан'
+    ]
   );
 
   runMany(

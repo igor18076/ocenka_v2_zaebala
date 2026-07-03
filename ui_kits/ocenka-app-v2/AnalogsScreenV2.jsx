@@ -1,20 +1,60 @@
 /* Analogs screen with detail modal — window.AnalogsScreen */
-window.AnalogsScreenV2 = function AnalogsScreenV2({ onNavigate, toast }) {
+window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }) {
   const { Card, Button, Badge } = NS;
   const D = window.OcenkaData;
+  const requestId = request?.id || D.object?.id;
+  const requestTitle = request?.object || D.object?.title || 'Объект оценки';
 
+  const [analogRows, setAnalogRows] = React.useState(D.analogsDetailed || []);
+  const [manualOpen, setManualOpen] = React.useState(false);
+  const [manualDraft, setManualDraft] = React.useState({ addr:'', source:'Ручной ввод', price:0, area:0, dist:'', cond:'Хорошее' });
   const [statuses, setStatuses] = React.useState(() => {
     const m = {};
     D.analogsDetailed.forEach(a => { m[a.id] = a.active; });
     return m;
   });
   const [selectedId, setSelectedId] = React.useState(null);
-  const selected = D.analogsDetailed.find(a => a.id === selectedId);
+  const selected = analogRows.find(a => a.id === selectedId);
 
   const toggleStatus = (id) => setStatuses(s => ({ ...s, [id]: !s[id] }));
   const activateAll = () => {
-    setStatuses(D.analogsDetailed.reduce((acc, analog) => ({ ...acc, [analog.id]: true }), {}));
+    setStatuses(analogRows.reduce((acc, analog) => ({ ...acc, [analog.id]: true }), {}));
     if (toast) toast('Аналоги подобраны');
+  };
+  const addManualAnalog = (event) => {
+    event.preventDefault();
+    if (!manualDraft.addr.trim() || !manualDraft.price || !manualDraft.area) return;
+    const id = `AN-${String(analogRows.length + 1).padStart(3, '0')}`;
+    const perM2 = Math.round(Number(manualDraft.price) / Number(manualDraft.area));
+    const next = {
+      id,
+      addr: manualDraft.addr.trim(),
+      fullAddr: manualDraft.addr.trim(),
+      source: manualDraft.source.trim() || 'Ручной ввод',
+      url: '',
+      active: true,
+      price: Number(manualDraft.price),
+      area: Number(manualDraft.area),
+      perM2,
+      dist: manualDraft.dist.trim() || '—',
+      cond: manualDraft.cond.trim() || 'Хорошее',
+      floors: 1,
+      year: new Date().getFullYear(),
+      wallMaterial: '—',
+      plotArea: '—',
+      adj: '0%',
+      final: Number(manualDraft.price).toLocaleString('ru-RU'),
+      comp: 'mid',
+      description: 'Аналог добавлен вручную для предварительного расчета.',
+      photos: 0,
+      addedDate: new Date().toLocaleDateString('ru-RU'),
+      adjRows: [{ factor:'Ручная корректировка', pct:0 }],
+    };
+    setAnalogRows((rows) => [next, ...rows]);
+    setStatuses((items) => ({ ...items, [id]: true }));
+    setManualDraft({ addr:'', source:'Ручной ввод', price:0, area:0, dist:'', cond:'Хорошее' });
+    setManualOpen(false);
+    if (toast) toast('Аналог добавлен');
   };
 
   const compBadge = (c) => {
@@ -31,16 +71,16 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ onNavigate, toast }) {
 
   return (
     <div>
-      <PageHead title="Подбор аналогов" subtitle="Объект ОЗ-1040 · Жилой дом, пос. Барвиха"
+      <PageHead title="Подбор аналогов" subtitle={`Заявка ${requestId} · ${requestTitle}`}
         actions={[
-          <Button key="m" variant="secondary" iconLeft={<Icon n="plus" size={16} />} onClick={() => toast && toast('Ручное добавление доступно в расчете')}>Добавить вручную</Button>,
+          <Button key="m" variant="secondary" iconLeft={<Icon n="plus" size={16} />} onClick={() => setManualOpen(true)}>Добавить вручную</Button>,
           <Button key="a" variant="primary"   iconLeft={<Icon n="sparkles" size={16} />} onClick={activateAll}>Подобрать аналоги</Button>,
         ]} />
 
       {/* KPI strip */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:20 }}>
         {[
-          { l:'Найдено аналогов',        v:'4',          i:'git-compare',  t:'brand' },
+          { l:'Найдено аналогов',        v:String(analogRows.length),          i:'git-compare',  t:'brand' },
           { l:'Средняя цена за м²',      v:'119 559 ₽',  i:'ruler',        t:'brand' },
           { l:'Радиус поиска',           v:'4.0 км',     i:'map-pin',      t:'brand' },
           { l:'Высокая сопоставимость',  v:'2',          i:'badge-check',  t:'accent' },
@@ -61,7 +101,7 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ onNavigate, toast }) {
               </tr>
             </thead>
             <tbody>
-              {D.analogsDetailed.map((a) => {
+              {analogRows.map((a) => {
                 const active = statuses[a.id];
                 return (
                   <tr key={a.id} onClick={() => setSelectedId(a.id)} style={{ cursor:'pointer', transition:'background .1s' }}
@@ -193,11 +233,15 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ onNavigate, toast }) {
               {/* Source link */}
               <div style={{ padding:'12px 16px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)', display:'flex', alignItems:'center', gap:10 }}>
                 <Icon n="external-link" size={16} style={{ color:'var(--text-link)', flexShrink:0 }} />
-                <a href={selected.url} target="_blank" rel="noreferrer"
-                  style={{ color:'var(--text-link)', fontSize:'var(--text-sm)', fontFamily:'var(--font-mono)', wordBreak:'break-all', flex:1 }}
-                  onClick={e => e.stopPropagation()}>
-                  {selected.url}
-                </a>
+                {selected.url ? (
+                  <a href={selected.url} target="_blank" rel="noreferrer"
+                    style={{ color:'var(--text-link)', fontSize:'var(--text-sm)', fontFamily:'var(--font-mono)', wordBreak:'break-all', flex:1 }}
+                    onClick={e => e.stopPropagation()}>
+                    {selected.url}
+                  </a>
+                ) : (
+                  <span style={{ color:'var(--text-muted)', fontSize:'var(--text-sm)', flex:1 }}>Источник добавлен вручную</span>
+                )}
                 <span style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', flexShrink:0 }}>добавлено {selected.addedDate}</span>
               </div>
             </div>
@@ -220,6 +264,35 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ onNavigate, toast }) {
               </div>
             </div>
           </div>
+        </div>
+      ) : null}
+      {manualOpen ? (
+        <div style={{ position:'fixed', inset:0, zIndex:210, background:'rgba(15, 23, 42, .42)', display:'grid', placeItems:'center', padding:24 }} onMouseDown={() => setManualOpen(false)}>
+          <form onSubmit={addManualAnalog} onMouseDown={(event) => event.stopPropagation()} style={{ width:'min(100%, 560px)', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow-lg)', overflow:'hidden' }}>
+            <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <div style={{ fontSize:'var(--text-lg)', fontWeight:800, color:'var(--text-strong)' }}>Новый аналог</div>
+                <div style={{ marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-sm)' }}>Будет добавлен в текущую подборку</div>
+              </div>
+              <button type="button" onClick={() => setManualOpen(false)} aria-label="Закрыть" style={{ border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', padding:6 }}><Icon n="x" size={18} /></button>
+            </div>
+            <div style={{ padding:20, display:'grid', gap:14 }}>
+              <NS.Input label="Адрес" required value={manualDraft.addr} onChange={(event) => setManualDraft((p) => ({ ...p, addr:event.target.value }))} />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <NS.Input label="Источник" value={manualDraft.source} onChange={(event) => setManualDraft((p) => ({ ...p, source:event.target.value }))} />
+                <NS.Input label="Расстояние" value={manualDraft.dist} onChange={(event) => setManualDraft((p) => ({ ...p, dist:event.target.value }))} />
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+                <NS.Input label="Цена, ₽" type="number" required value={manualDraft.price} onChange={(event) => setManualDraft((p) => ({ ...p, price:event.target.value }))} />
+                <NS.Input label="Площадь, м²" type="number" required value={manualDraft.area} onChange={(event) => setManualDraft((p) => ({ ...p, area:event.target.value }))} />
+                <NS.Input label="Состояние" value={manualDraft.cond} onChange={(event) => setManualDraft((p) => ({ ...p, cond:event.target.value }))} />
+              </div>
+            </div>
+            <div style={{ padding:'14px 20px', borderTop:'1px solid var(--divider)', display:'flex', justifyContent:'flex-end', gap:10 }}>
+              <Button type="button" variant="secondary" onClick={() => setManualOpen(false)}>Отмена</Button>
+              <Button type="submit" variant="primary" iconLeft={<Icon n="plus" size={16} />}>Добавить</Button>
+            </div>
+          </form>
         </div>
       ) : null}
     </div>

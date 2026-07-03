@@ -38,12 +38,14 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
   const [dragId, setDragId] = React.useState(null);
   const [dropStatus, setDropStatus] = React.useState(null);
   const [isCreateOpen, setCreateOpen] = React.useState(false);
+  const [editingRequestId, setEditingRequestId] = React.useState(null);
   const [draft, setDraft] = React.useState({
     object: '',
     address: '',
     client: '',
     type: 'Рыночная',
     owner: '',
+    status: 'new',
   });
   const draggedRef = React.useRef(false);
 
@@ -60,7 +62,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
       setQuery(String(event.detail || ''));
       setFiltersOpen(false);
     };
-    const openCreate = () => setCreateOpen(true);
+    const openCreate = () => openCreateModal();
     window.addEventListener('ocenka:request-search', applyGlobalSearch);
     window.addEventListener('ocenka:create-request', openCreate);
     return () => {
@@ -75,6 +77,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
   };
   const normalize = (value) => String(value || '').trim().toLowerCase();
   const owners = Array.from(new Set(requests.map((item) => item.owner).filter(hasOwner))).sort();
+  const createTypes = ['Рыночная', 'Залоговая'];
   const types = Array.from(new Set(requests.map((item) => item.type).filter(Boolean))).sort();
 
   const filtered = requests.filter((request) => {
@@ -108,6 +111,33 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
     setRequests(D.requests || []);
     resetFilters();
   };
+  const emptyDraft = { object: '', address: '', client: '', type: 'Рыночная', owner: '', status: 'new' };
+
+  const openCreateModal = () => {
+    setEditingRequestId(null);
+    setDraft(emptyDraft);
+    setCreateOpen(true);
+  };
+
+  const openEditModal = (event, request) => {
+    event.stopPropagation();
+    setEditingRequestId(request.id);
+    setDraft({
+      object: request.object || '',
+      address: request.address || '',
+      client: request.client || '',
+      type: request.type || 'Рыночная',
+      owner: hasOwner(request.owner) ? request.owner : '',
+      status: statusOrder.includes(request.status) ? request.status : 'new',
+    });
+    setCreateOpen(true);
+  };
+
+  const closeRequestModal = () => {
+    setCreateOpen(false);
+    setEditingRequestId(null);
+    setDraft(emptyDraft);
+  };
 
   const nextRequestId = () => {
     const max = requests.reduce((value, request) => {
@@ -117,7 +147,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
     return `ОЗ-${max + 1}`;
   };
 
-  const createRequest = (event) => {
+  const saveRequest = (event) => {
     event.preventDefault();
     const object = draft.object.trim();
     const address = draft.address.trim();
@@ -125,18 +155,25 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
     if (!object || !address || !client) return;
 
     const request = {
-      id: nextRequestId(),
+      id: editingRequestId || nextRequestId(),
       object,
       address,
       client,
       type: draft.type || 'Рыночная',
-      status: 'new',
+      status: statusOrder.includes(draft.status) ? draft.status : 'new',
       date: new Date().toLocaleDateString('ru-RU'),
       owner: draft.owner.trim() || '—',
     };
-    setRequests((items) => [request, ...items]);
-    setDraft({ object: '', address: '', client: '', type: 'Рыночная', owner: '' });
-    setCreateOpen(false);
+    setRequests((items) => editingRequestId
+      ? items.map((item) => item.id === editingRequestId ? { ...item, ...request, id: item.id, date: item.date || request.date } : item)
+      : [request, ...items]);
+    closeRequestModal();
+  };
+
+  const deleteEditingRequest = () => {
+    if (!editingRequestId) return;
+    setRequests((items) => items.filter((item) => item.id !== editingRequestId));
+    closeRequestModal();
   };
 
   const totalActive = requests.filter((request) => request.status !== 'ready').length;
@@ -197,7 +234,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
           <Button key="filter" variant={filtersOpen ? 'primary' : 'secondary'} iconLeft={<Icon n="sliders-horizontal" size={16} />} onClick={() => setFiltersOpen((value) => !value)}>
             Фильтры{filterCount ? ` · ${filterCount}` : ''}
           </Button>,
-          <Button key="new" variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={() => setCreateOpen(true)}>Новая заявка</Button>,
+          <Button key="new" variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={openCreateModal}>Новая заявка</Button>,
         ]}
       />
 
@@ -314,7 +351,17 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
                     >
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:10 }}>
                         <span className="ds-mono" style={{ fontSize:'var(--text-xs)', fontWeight:800, color:'var(--blue-700)' }}>{request.id}</span>
-                        <Badge tone={request.status === 'ready' ? 'success' : request.status === 'review' ? 'warning' : 'neutral'}>{request.type}</Badge>
+                        <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+                          <Badge tone={request.status === 'ready' ? 'success' : request.status === 'review' ? 'warning' : 'neutral'}>{request.type}</Badge>
+                          <button
+                            type="button"
+                            title="Редактировать заявку"
+                            onClick={(event) => openEditModal(event, request)}
+                            style={{ width:24, height:24, border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-sm)', background:'var(--surface-card)', color:'var(--text-muted)', cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center' }}
+                          >
+                            <Icon n="pencil" size={13} />
+                          </button>
+                        </span>
                       </div>
                       <div style={{ fontWeight:700, color:'var(--text-strong)', lineHeight:1.25, overflowWrap:'anywhere' }}>{request.object}</div>
                       <div style={{ marginTop:6, color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.35, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{request.address}</div>
@@ -350,14 +397,14 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
       </div>
 
       {isCreateOpen ? (
-        <div style={{ position:'fixed', inset:0, zIndex:60, background:'rgba(15, 23, 42, .42)', display:'grid', placeItems:'center', padding:24 }} onMouseDown={() => setCreateOpen(false)}>
-          <form onSubmit={createRequest} onMouseDown={(event) => event.stopPropagation()} style={{ width:'min(100%, 560px)', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow-lg)', overflow:'hidden' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:60, background:'rgba(15, 23, 42, .42)', display:'grid', placeItems:'center', padding:24 }} onMouseDown={closeRequestModal}>
+          <form onSubmit={saveRequest} onMouseDown={(event) => event.stopPropagation()} style={{ width:'min(100%, 560px)', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow-lg)', overflow:'hidden' }}>
             <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--divider)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
               <div>
-                <div style={{ fontSize:'var(--text-lg)', fontWeight:800, color:'var(--text-strong)' }}>Новая заявка</div>
-                <div style={{ marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-sm)' }}>Заявка появится в колонке «Новые»</div>
+                <div style={{ fontSize:'var(--text-lg)', fontWeight:800, color:'var(--text-strong)' }}>{editingRequestId ? `Редактирование ${editingRequestId}` : 'Новая заявка'}</div>
+                <div style={{ marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-sm)' }}>{editingRequestId ? 'Изменения сохранятся на доске заявок' : 'Заявка появится в выбранной колонке'}</div>
               </div>
-              <button type="button" onClick={() => setCreateOpen(false)} aria-label="Закрыть" style={{ border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', padding:6 }}>
+              <button type="button" onClick={closeRequestModal} aria-label="Закрыть" style={{ border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', padding:6 }}>
                 <Icon n="x" size={18} />
               </button>
             </div>
@@ -372,15 +419,30 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
                 <div>
                   <label style={fieldLabel}>Тип оценки</label>
                   <select value={draft.type} onChange={(event) => setDraft((prev) => ({ ...prev, type:event.target.value }))} style={selectStyle}>
-                    {(types.length ? types : ['Рыночная', 'Кадастровая']).map((type) => <option key={type} value={type}>{type}</option>)}
+                    {(createTypes.length ? createTypes : ['Рыночная']).map((type) => <option key={type} value={type}>{type}</option>)}
                   </select>
                 </div>
                 <Input label="Ответственный" value={draft.owner} onChange={(event) => setDraft((prev) => ({ ...prev, owner:event.target.value }))} placeholder="Можно оставить пустым" />
               </div>
+              <div>
+                <label style={fieldLabel}>Стадия</label>
+                <select value={draft.status} onChange={(event) => setDraft((prev) => ({ ...prev, status:event.target.value }))} style={selectStyle}>
+                  {statusOrder.map((status) => <option key={status} value={status}>{statusTitles[status]}</option>)}
+                </select>
+              </div>
             </div>
-            <div style={{ padding:'14px 20px', borderTop:'1px solid var(--divider)', display:'flex', justifyContent:'flex-end', gap:10 }}>
-              <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Отмена</Button>
-              <Button type="submit" variant="primary" iconLeft={<Icon n="plus" size={16} />}>Создать</Button>
+            <div style={{ padding:'14px 20px', borderTop:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', gap:10 }}>
+              <div>
+                {editingRequestId ? (
+                  <button type="button" onClick={deleteEditingRequest} style={{ height:36, padding:'0 14px', border:'1px solid var(--danger)', borderRadius:'var(--radius-md)', background:'transparent', color:'var(--danger-text)', fontFamily:'var(--font-sans)', fontSize:'var(--text-sm)', fontWeight:700, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:8 }}>
+                    <Icon n="trash-2" size={15} /> Удалить
+                  </button>
+                ) : null}
+              </div>
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:10 }}>
+                <Button type="button" variant="secondary" onClick={closeRequestModal}>Отмена</Button>
+                <Button type="submit" variant="primary" iconLeft={<Icon n={editingRequestId ? 'save' : 'plus'} size={16} />}>{editingRequestId ? 'Сохранить' : 'Создать'}</Button>
+              </div>
             </div>
           </form>
         </div>

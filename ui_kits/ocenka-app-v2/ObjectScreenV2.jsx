@@ -1,13 +1,74 @@
 /* Object card — details, documents, photos. window.ObjectScreen */
-window.ObjectScreenV2 = function ObjectScreenV2({ onBack, onNavigate, toast }) {
+window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, toast }) {
   const { Card, Button, Badge, StatusBadge, Tabs } = NS;
   const D = window.OcenkaData;
-  const o = D.object;
+  const baseObject = D.object;
+  const objectStorageKey = (id) => `ocenka.object.${id || baseObject.id || 'default'}.v1`;
+  const makeObject = (source) => source ? {
+    ...baseObject,
+    id: source.id,
+    title: source.object || baseObject.title,
+    address: source.address || baseObject.address,
+    client: source.client || baseObject.client,
+    valueType: source.type ? `${source.type} стоимость` : baseObject.valueType,
+    date: source.date || baseObject.date,
+    status: source.status || 'calc',
+  } : { ...baseObject, status: 'calc' };
+  const loadObject = (source) => {
+    const next = makeObject(source);
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(objectStorageKey(next.id)) || 'null');
+      return saved && saved.id === next.id ? { ...next, ...saved } : next;
+    } catch {
+      return next;
+    }
+  };
+  const [o, setObject] = React.useState(() => loadObject(request));
+  const [draftObject, setDraftObject] = React.useState(() => loadObject(request));
+  const [editMode, setEditMode] = React.useState(false);
   const [tab, setTab] = React.useState('params');
   const [docs, setDocs] = React.useState(o.docs || []);
   const fileRef = React.useRef(null);
 
   const fileIcon = (kind) => kind === 'doc' ? 'file-text' : 'file';
+  const fieldStyle = { width:'100%', boxSizing:'border-box', border:'1px solid var(--border-default)', borderRadius:'var(--radius-sm)', padding:'8px 10px', font:'inherit', color:'var(--text-strong)', background:'var(--surface-card)', outline:'none' };
+  const editField = (label, key, mono) => (
+    <div>
+      <label style={{ display:'block', marginBottom:6, fontSize:'var(--text-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.04em' }}>{label}</label>
+      <input value={draftObject[key] || ''} onChange={(event) => setDraftObject((prev) => ({ ...prev, [key]: event.target.value }))} style={{ ...fieldStyle, fontFamily: mono ? 'var(--font-mono)' : 'var(--font-sans)' }} />
+    </div>
+  );
+  const saveObject = () => {
+    setObject({ ...draftObject, docs });
+    setEditMode(false);
+    if (toast) toast('Карточка объекта обновлена');
+  };
+  const downloadDoc = (doc) => {
+    const blob = new Blob([`Документ: ${doc.name}\nЗаявка: ${o.id}\nОбъект: ${o.title}\n`], { type:'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = doc.name.replace(/\.(pdf|docx?)$/i, '') + '.txt';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    if (toast) toast('Документ скачивается');
+  };
+
+  React.useEffect(() => {
+    const next = loadObject(request);
+    setObject(next);
+    setDraftObject(next);
+    setDocs(next.docs || []);
+    setEditMode(false);
+  }, [request?.id]);
+  React.useEffect(() => {
+    if (!o?.id) return;
+    try {
+      window.localStorage.setItem(objectStorageKey(o.id), JSON.stringify({ ...o, docs }));
+    } catch {}
+  }, [o, docs]);
 
   return (
     <div>
@@ -22,12 +83,19 @@ window.ObjectScreenV2 = function ObjectScreenV2({ onBack, onNavigate, toast }) {
 
       <PageHead title={o.title} subtitle={o.address}
         actions={[
-          <Button key="e" variant="secondary" iconLeft={<Icon n="pencil" size={16} />} onClick={() => { setTab('params'); if (toast) toast('Параметры объекта открыты для проверки'); }}>Редактировать</Button>,
+          <Button key="e" variant={editMode ? 'primary' : 'secondary'} iconLeft={<Icon n={editMode ? 'save' : 'pencil'} size={16} />} onClick={() => {
+            setTab('params');
+            if (editMode) saveObject();
+            else {
+              setDraftObject(o);
+              setEditMode(true);
+            }
+          }}>{editMode ? 'Сохранить объект' : 'Редактировать'}</Button>,
           <Button key="c" variant="primary" iconLeft={<Icon n="calculator" size={16} />} onClick={() => onNavigate('calc')}>Перейти к расчету</Button>,
         ]} />
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <StatusBadge status="calc" />
+        <StatusBadge status={o.status || 'calc'} />
         <Badge tone="brand">{o.valueType}</Badge>
         <Badge tone="outline">{o.purpose}</Badge>
       </div>
@@ -44,17 +112,41 @@ window.ObjectScreenV2 = function ObjectScreenV2({ onBack, onNavigate, toast }) {
             </div>
             <div style={{ padding: 24 }}>
               {tab === 'params' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '22px 24px' }}>
-                  <DetailField label="Тип объекта" value={o.type} />
-                  <DetailField label="Площадь" value={o.area} />
-                  <DetailField label="Этажность" value={o.floors} />
-                  <DetailField label="Год постройки" value={o.year} />
-                  <DetailField label="Кадастровый №" value={o.cadastral} mono />
-                  <DetailField label="Дата оценки" value={o.date} />
-                  <DetailField label="Цель оценки" value={o.purpose} />
-                  <DetailField label="Вид стоимости" value={o.valueType} />
-                  <DetailField label="Заказчик" value={o.client} />
-                </div>
+                editMode ? (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '18px 20px' }}>
+                      {editField('Наименование объекта', 'title')}
+                      {editField('Тип объекта', 'type')}
+                      {editField('Площадь', 'area')}
+                      {editField('Этажность', 'floors')}
+                      {editField('Год постройки', 'year')}
+                      {editField('Кадастровый №', 'cadastral', true)}
+                      {editField('Дата оценки', 'date')}
+                      {editField('Цель оценки', 'purpose')}
+                      {editField('Вид стоимости', 'valueType')}
+                    </div>
+                    <div style={{ marginTop:18, display:'grid', gridTemplateColumns:'2fr 1fr', gap:20 }}>
+                      {editField('Адрес', 'address')}
+                      {editField('Заказчик', 'client')}
+                    </div>
+                    <div style={{ marginTop:18, display:'flex', justifyContent:'flex-end', gap:10 }}>
+                      <Button variant="secondary" onClick={() => { setDraftObject(o); setEditMode(false); }}>Отмена</Button>
+                      <Button variant="primary" iconLeft={<Icon n="save" size={16} />} onClick={saveObject}>Сохранить</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '22px 24px' }}>
+                    <DetailField label="Тип объекта" value={o.type} />
+                    <DetailField label="Площадь" value={o.area} />
+                    <DetailField label="Этажность" value={o.floors} />
+                    <DetailField label="Год постройки" value={o.year} />
+                    <DetailField label="Кадастровый №" value={o.cadastral} mono />
+                    <DetailField label="Дата оценки" value={o.date} />
+                    <DetailField label="Цель оценки" value={o.purpose} />
+                    <DetailField label="Вид стоимости" value={o.valueType} />
+                    <DetailField label="Заказчик" value={o.client} />
+                  </div>
+                )
               ) : null}
 
               {tab === 'docs' ? (
@@ -68,7 +160,8 @@ window.ObjectScreenV2 = function ObjectScreenV2({ onBack, onNavigate, toast }) {
                         <div style={{ fontWeight: 600, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>{d.name}</div>
                         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{d.size}</div>
                       </div>
-                      <span style={{ color: 'var(--text-muted)' }}><Icon n="download" size={17} /></span>
+                      <button type="button" onClick={() => downloadDoc(d)} aria-label="Скачать документ" style={{ border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer', padding:6, display:'inline-flex' }}><Icon n="download" size={17} /></button>
+                      <button type="button" onClick={() => setDocs((items) => items.filter((_, index) => index !== i))} aria-label="Удалить документ" style={{ border:'none', background:'transparent', color:'var(--danger-text)', cursor:'pointer', padding:6, display:'inline-flex' }}><Icon n="trash-2" size={16} /></button>
                     </div>
                   ))}
                   <input

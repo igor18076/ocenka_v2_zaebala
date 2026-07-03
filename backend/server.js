@@ -287,7 +287,10 @@ function renderLoginPage(errorText = '') {
 }
 
 function ensureDatabase() {
-  if (fs.existsSync(dbPath)) return;
+  if (fs.existsSync(dbPath)) {
+    migrateDatabase();
+    return;
+  }
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   const { spawnSync } = require('node:child_process');
@@ -301,6 +304,43 @@ function ensureDatabase() {
   });
   if (result.status !== 0) {
     throw new Error(`Database seed failed: ${result.stderr || result.stdout}`);
+  }
+  migrateDatabase();
+}
+
+function migrateDatabase() {
+  const db = new DatabaseSync(dbPath);
+  try {
+    const clientColumns = new Set(db.prepare('PRAGMA table_info(clients)').all().map((column) => column.name));
+    if (!clientColumns.has('inn')) {
+      db.exec("ALTER TABLE clients ADD COLUMN inn TEXT NOT NULL DEFAULT '0000000000'");
+    }
+    if (!clientColumns.has('legal_address')) {
+      db.exec("ALTER TABLE clients ADD COLUMN legal_address TEXT NOT NULL DEFAULT 'Не указан'");
+    }
+    db.exec(`
+      UPDATE users
+      SET name = 'Игорь Дорощенко', role = 'Оценщик', initials = 'ИД', login = 'ocenka'
+      WHERE id = 1;
+      UPDATE nav_items SET label = 'Отчет' WHERE key = 'reports';
+      UPDATE requests SET owner = 'Игорь Дорощенко' WHERE owner = 'Игорь Власов';
+      UPDATE requests SET owner = 'Игорь Дорощенко' WHERE owner = 'Алексей Морозов';
+      UPDATE requests SET owner = 'Мария Кузнецова' WHERE owner = 'Анна Смирнова';
+      UPDATE requests SET owner = 'Павел Соколов' WHERE owner = 'Дмитрий Орлов';
+      UPDATE requests SET type = 'Рыночная' WHERE type = 'Кадастровая';
+      UPDATE appraisal_objects SET client = 'Петров Андрей Сергеевич' WHERE id = 'ОЗ-1040';
+    `);
+    const details = [
+      ['ПАО «Сбербанк»', '7707083893', '117997, г. Москва, ул. Вавилова, д. 19'],
+      ['ВТБ Банк', '7702070139', '190000, г. Санкт-Петербург, ул. Большая Морская, д. 29'],
+      ['ООО «Аркада»', '7723456789', '115054, г. Москва, ул. Валовая, д. 8, офис 12'],
+      ['Иванов Иван Петрович', '000000000000', 'Адрес регистрации не указан'],
+      ['ООО «ГеоИнвест»', '7712345678', '125040, г. Москва, Ленинградский пр-т, д. 15']
+    ];
+    const updateClient = db.prepare('UPDATE clients SET inn = ?, legal_address = ? WHERE name = ?');
+    details.forEach(([name, inn, address]) => updateClient.run(inn, address, name));
+  } finally {
+    db.close();
   }
 }
 
@@ -355,7 +395,7 @@ function loadOcenkaData() {
     const result = db.prepare('SELECT value, low, high, date FROM valuation_results WHERE id = 1').get();
     const fso = db.prepare('SELECT label, done FROM fso_items ORDER BY sort_order').all()
       .map((item) => ({ ...item, done: bool(item.done) }));
-    const clients = db.prepare('SELECT name, kind, orders, contact FROM clients ORDER BY id').all();
+    const clients = db.prepare('SELECT name, kind, orders, contact, inn, legal_address AS legalAddress FROM clients ORDER BY id').all();
     const analyticsProps = db.prepare(`
       SELECT id, addr, district, line, class, era, type, series, floors,
              wall_material AS wallMaterial, cond, use_type AS useType, comm_type AS commType,
