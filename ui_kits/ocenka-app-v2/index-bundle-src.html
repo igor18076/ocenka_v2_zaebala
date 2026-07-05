@@ -83,10 +83,41 @@
   <script type="text/babel" src="AnalyticsScreen.jsx"></script>
 
   <script type="text/babel" data-presets="react">
+    function normalizeRequestId(id) {
+      return String(id || '').replace(/^ОЗ-/, '03-');
+    }
+
+    function normalizeRequestRow(request) {
+      return request ? { ...request, id: normalizeRequestId(request.id) } : request;
+    }
+
+    function migrateLegacyStorage() {
+      if (window.__ocenkaLegacyStorageMigrated) return;
+      window.__ocenkaLegacyStorageMigrated = true;
+      try {
+        const storageKeys = Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index)).filter(Boolean);
+        storageKeys.forEach((key) => {
+          if (!key.includes('ОЗ-')) return;
+          const nextKey = key.replaceAll('ОЗ-', '03-');
+          const nextValue = String(window.localStorage.getItem(key) || '').replaceAll('ОЗ-', '03-');
+          if (!window.localStorage.getItem(nextKey)) {
+            window.localStorage.setItem(nextKey, nextValue);
+          }
+          window.localStorage.removeItem(key);
+        });
+        const kanbanKey = 'ocenka.requests.kanban.v1';
+        const rows = JSON.parse(window.localStorage.getItem(kanbanKey) || 'null');
+        if (Array.isArray(rows)) {
+          window.localStorage.setItem(kanbanKey, JSON.stringify(rows.map(normalizeRequestRow)));
+        }
+      } catch {}
+    }
+
     function App() {
+      migrateLegacyStorage();
       const [active, setActive] = React.useState('dashboard');
       const [toastMsg, setToastMsg] = React.useState(null);
-      const [selectedRequest, setSelectedRequest] = React.useState(() => (window.OcenkaData.requests || []).find((request) => request.id === window.OcenkaData.object?.id) || (window.OcenkaData.requests || [])[0] || null);
+      const [selectedRequest, setSelectedRequest] = React.useState(() => normalizeRequestRow((window.OcenkaData.requests || []).find((request) => normalizeRequestId(request.id) === normalizeRequestId(window.OcenkaData.object?.id)) || (window.OcenkaData.requests || [])[0] || null));
       const contentRef = React.useRef(null);
 
       const toast = (msg) => {
@@ -100,7 +131,7 @@
         if (contentRef.current) contentRef.current.scrollTop = 0;
       };
       const openRequest = (request) => {
-        if (request) setSelectedRequest(request);
+        if (request) setSelectedRequest(normalizeRequestRow(request));
         navigate('objects');
       };
 

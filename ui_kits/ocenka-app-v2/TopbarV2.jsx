@@ -4,6 +4,20 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
   const D = window.OcenkaData;
   const [query, setQuery] = React.useState('');
   const [menu, setMenu] = React.useState(null);
+  const readSettings = () => {
+    try { return JSON.parse(window.localStorage.getItem('ocenka.settings.v1') || '{}'); } catch { return {}; }
+  };
+  const [savedSettings, setSavedSettings] = React.useState(readSettings);
+  React.useEffect(() => {
+    const refresh = () => setSavedSettings(readSettings());
+    window.addEventListener('ocenka:settings-updated', refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener('ocenka:settings-updated', refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
+  const user = { ...D.user, name: savedSettings.name || D.user.name };
 
   const runSearch = () => {
     const value = query.trim();
@@ -68,10 +82,10 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
       <div style={{ width: 1, height: 28, background: 'var(--divider)' }} />
 
       <button onClick={() => setMenu(menu === 'profile' ? null : 'profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 'var(--radius-md)' }}>
-        <Avatar name={D.user.name} />
+        <Avatar name={user.name} />
         <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)' }}>{D.user.name}</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{D.user.role}</div>
+          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)' }}>{user.name}</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{user.role}</div>
         </div>
         <Icon n="chevron-down" size={16} style={{ color: 'var(--text-muted)' }} />
       </button>
@@ -102,10 +116,10 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
           {menu === 'profile' ? (
             <React.Fragment>
               <div style={{ display:'flex', alignItems:'center', gap:10, padding:'4px 4px 12px' }}>
-                <Avatar name={D.user.name} />
+                <Avatar name={user.name} />
                 <div>
-                  <div style={{ fontWeight:800, color:'var(--text-strong)' }}>{D.user.name}</div>
-                  <div style={{ color:'var(--text-muted)', fontSize:'var(--text-xs)' }}>{D.user.role}</div>
+                  <div style={{ fontWeight:800, color:'var(--text-strong)' }}>{user.name}</div>
+                  <div style={{ color:'var(--text-muted)', fontSize:'var(--text-xs)' }}>{user.role}</div>
                 </div>
               </div>
               <Button variant="secondary" block onClick={() => { setMenu(null); window.ocenkaGoTo && window.ocenkaGoTo('settings'); }}>Настройки профиля</Button>

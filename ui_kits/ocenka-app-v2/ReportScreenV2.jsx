@@ -20,6 +20,9 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     }
   })();
   const o = { ...initialObject, ...savedObject };
+  const settings = (() => {
+    try { return JSON.parse(window.localStorage.getItem('ocenka.settings.v1') || '{}'); } catch { return {}; }
+  })();
   const reportSections = D.reportSections || [];
   const report = D.report || {};
   const reviewStorageKey = `ocenka.report.review.${o.id}.v1`;
@@ -29,6 +32,10 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const [loadedReviewId, setLoadedReviewId] = React.useState(o.id);
   const calc = D.calculation || {};
   const fmt = (n) => Math.round(n || 0).toLocaleString('ru-RU');
+  const toNum = (value, fallback = 0) => {
+    const parsed = Number(String(value ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
   const loadSavedCalculation = (id) => {
     try {
       return JSON.parse(window.localStorage.getItem(`ocenka.calculation.${id || 'draft'}.v1`) || 'null') || {};
@@ -43,28 +50,29 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const income = savedCalc.inc || calc.income || {};
   const rentRows = savedCalc.rentRows || income.rentAnalogs || [];
   const cst = savedCalc.cst || calc.cost || {};
-  const subjectArea = calc.subjectArea || 214.6;
-  const compValue = rows.length ? Math.round(rows.reduce((sum, row) => {
-    const weightSum = rows.reduce((total, item) => total + (Number(item.w) || 0), 0) || 1;
-    const adj = 1 + ((row.adjTorg || 0) + (row.adjLoc || 0) + (row.adjRep || 0) + (row.adjFlr || 0)) / 100;
-    return sum + (row.price / row.area) * adj * ((Number(row.w) || 0) / weightSum);
+  const subjectArea = toNum(savedCalc.subjectArea ?? calc.subjectArea ?? D.object?.area, 214.6) || 214.6;
+  const validRows = rows.filter((row) => toNum(row.price) > 0 && toNum(row.area) > 0);
+  const compValue = validRows.length ? Math.round(validRows.reduce((sum, row) => {
+    const weightSum = validRows.reduce((total, item) => total + Math.max(0, toNum(item.w)), 0) || 1;
+    const adj = 1 + (toNum(row.adjTorg) + toNum(row.adjLoc) + toNum(row.adjRep) + toNum(row.adjFlr)) / 100;
+    return sum + (toNum(row.price) / toNum(row.area, 1)) * adj * (Math.max(0, toNum(row.w)) / weightSum);
   }, 0) * subjectArea) : 0;
   const rentRate = rentRows.length ? Math.round(rentRows.reduce((sum, row) => {
-    const weight = Number(row.weight) || 0;
-    const adjusted = row.rentPerM2 * (1 + ((row.adjLoc || 0) + (row.adjCond || 0)) / 100);
+    const weight = toNum(row.weight);
+    const adjusted = toNum(row.rentPerM2) * (1 + (toNum(row.adjLoc) + toNum(row.adjCond)) / 100);
     return sum + adjusted * weight;
-  }, 0) / (rentRows.reduce((sum, row) => sum + (Number(row.weight) || 0), 0) || 1)) : income.rent;
-  const pgi = Math.round((income.area || 0) * (rentRate || 0) * 12);
-  const egi = Math.round(pgi * (1 - (income.vacancy || 0) / 100));
-  const noi = Math.round(egi * (1 - (income.opex || 0) / 100));
-  const incomeValue = Math.round(noi / ((income.cap || 1) / 100));
-  const costValue = Math.round((((cst.n || 0) * (cst.m || 0) * (cst.kPer || 1) * (cst.kReg || 1) * (cst.kZon || 1) * (cst.kSeis || 1) * (cst.kF || 1)) + (cst.zd || 0)) * (cst.kInd || 1) * (1 + (cst.vat || 0) / 100));
+  }, 0) / (rentRows.reduce((sum, row) => sum + toNum(row.weight), 0) || 1)) : toNum(income.rent);
+  const pgi = Math.round(toNum(income.area) * toNum(rentRate) * 12);
+  const egi = Math.round(pgi * (1 - toNum(income.vacancy) / 100));
+  const noi = Math.round(egi * (1 - toNum(income.opex) / 100));
+  const incomeValue = toNum(income.cap) > 0 ? Math.round(noi / (toNum(income.cap) / 100)) : 0;
+  const costValue = Math.round(((toNum(cst.n) * toNum(cst.m) * toNum(cst.kPer, 1) * toNum(cst.kReg, 1) * toNum(cst.kZon, 1) * toNum(cst.kSeis, 1) * toNum(cst.kF, 1)) + toNum(cst.zd)) * toNum(cst.kInd, 1) * (1 + toNum(cst.vat) / 100));
   const finalRows = [
     { key:'comp', name:'Сравнительный подход', value:compValue, weight:weights.comp ?? 60 },
     { key:'income', name:'Доходный подход', value:incomeValue, weight:weights.income ?? 10 },
     { key:'cost', name:'Затратный подход', value:costValue, weight:weights.cost ?? 30 },
   ].filter((row) => applied[row.key] !== false);
-  const finalValue = savedCalc.final || Math.round(finalRows.reduce((sum, row) => sum + row.value * row.weight, 0) / (finalRows.reduce((sum, row) => sum + row.weight, 0) || 1));
+  const finalValue = savedCalc.final || Math.round(finalRows.reduce((sum, row) => sum + toNum(row.value) * toNum(row.weight), 0) / (finalRows.reduce((sum, row) => sum + toNum(row.weight), 0) || 1));
   const doneSections = reportSections.filter((section) => section.done).length;
   const reportReady = Math.round((doneSections / (reportSections.length || 1)) * 100);
   React.useEffect(() => {
@@ -82,7 +90,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     } catch {}
   }, [reviewStorageKey, loadedReviewId, o.id, reviewSent]);
   const cell = { padding:'8px 10px', borderBottom:'1px solid var(--divider)', fontSize:'var(--text-sm)' };
-  const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${o.id}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}</style></head><body><h1>Отчет об оценке №${o.id}</h1><p><b>Объект:</b> ${o.title}</p><p><b>Адрес:</b> ${o.address}</p><p><b>Заказчик:</b> ${o.client}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p><h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = (row.adjLoc || 0) + (row.adjCond || 0); const adjusted = Math.round(row.rentPerM2 * (1 + correction / 100)); return `<tr><td>${row.addr}</td><td class="num">${fmt(row.rentPerM2)}</td><td class="num">${correction}%</td><td class="num">${Number(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${row.name}</td><td class="num">${fmt(row.value)} ₽</td><td class="num">${Number(row.weight).toFixed(2)}%</td><td class="num">${fmt(row.value * row.weight / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
+  const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${o.id}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.photo{height:88px;border:1px solid #ccc;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#555}</style></head><body><h1>Отчет об оценке №${o.id}</h1><p><b>Объект:</b> ${o.title}</p><p><b>Адрес:</b> ${o.address}</p><p><b>Заказчик:</b> ${o.client}</p><p><b>Оценщик:</b> ${settings.name || window.OcenkaData.user?.name || 'Игорь Дорощенко'}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p>${settings.includePhotos !== false ? `<h2>Фотографии объекта</h2><div class="photos">${Array.from({ length: Math.min(toNum(o.photos), 6) }).map((_, index) => `<div class="photo">Фото ${index + 1}</div>`).join('')}</div>` : ''}<h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = toNum(row.adjLoc) + toNum(row.adjCond); const adjusted = Math.round(toNum(row.rentPerM2) * (1 + correction / 100)); return `<tr><td>${row.addr}</td><td class="num">${fmt(toNum(row.rentPerM2))}</td><td class="num">${correction}%</td><td class="num">${toNum(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${row.name}</td><td class="num">${fmt(toNum(row.value))} ₽</td><td class="num">${toNum(row.weight).toFixed(2)}%</td><td class="num">${fmt(toNum(row.value) * toNum(row.weight) / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
   const downloadDoc = () => {
     const blob = new Blob([reportHtml()], { type:'application/msword;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -105,6 +113,14 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     win.document.close();
     win.focus();
     win.print();
+  };
+  const downloadDefault = () => {
+    if ((settings.reportFormat || 'doc') === 'pdf') openPdfPrint();
+    else downloadDoc();
+  };
+  const sendToReview = () => {
+    setReviewSent(true);
+    toast(settings.notifyClient ? 'Отчет отправлен на проверку, клиент будет уведомлен' : 'Отчет отправлен на проверку');
   };
 
   return (
@@ -134,8 +150,8 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
               <p style={{ color: 'var(--text-muted)', marginTop: 6, fontSize: 'var(--text-sm)' }}>{o.address}</p>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                <Badge tone="brand">DOC</Badge>
-                <Badge tone="info">PDF</Badge>
+                <Badge tone={(settings.reportFormat || 'doc') === 'doc' ? 'brand' : 'neutral'}>DOC</Badge>
+                <Badge tone={(settings.reportFormat || 'doc') === 'pdf' ? 'brand' : 'info'}>PDF</Badge>
                 <Badge tone={reviewSent ? 'warning' : 'success'} pill dot={!reviewSent}>{reviewSent ? 'На проверке' : 'Готов к формированию'}</Badge>
               </div>
 
@@ -144,13 +160,14 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
                 <DetailField label="Итоговая стоимость" value={`${fmt(finalValue)} ₽`} />
                 <DetailField label="Дата оценки" value={o.date} />
                 <DetailField label="Номер заявки" value={o.id} mono />
-                <DetailField label="Объем отчета" value={`≈ ${report.pageCount} страниц`} />
+                <DetailField label="Объем отчета" value={`≈ ${toNum(report.pageCount) + (settings.includePhotos === false ? 0 : Math.ceil(toNum(o.photos) / 3))} страниц`} />
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
+                <Button variant="primary" iconLeft={<Icon n="download" size={16} />} onClick={downloadDefault}>Скачать по умолчанию</Button>
                 <Button variant="primary" iconLeft={<Icon n="file-text" size={16} />} onClick={downloadDoc}>Скачать DOC</Button>
                 <Button variant="secondary" iconLeft={<Icon n="file-down" size={16} />} onClick={openPdfPrint}>Скачать PDF</Button>
-                <Button variant="ghost" iconLeft={<Icon n="send" size={16} />} onClick={() => { setReviewSent(true); toast('Отчет отправлен на проверку'); }}>Отправить на проверку</Button>
+                <Button variant="ghost" iconLeft={<Icon n="send" size={16} />} onClick={sendToReview}>Отправить на проверку</Button>
               </div>
             </div>
           </div>
@@ -184,14 +201,14 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
               </thead>
               <tbody>
                 {rentRows.map((row) => {
-                  const correction = (row.adjLoc || 0) + (row.adjCond || 0);
-                  const adjusted = Math.round(row.rentPerM2 * (1 + correction / 100));
+                  const correction = toNum(row.adjLoc) + toNum(row.adjCond);
+                  const adjusted = Math.round(toNum(row.rentPerM2) * (1 + correction / 100));
                   return (
                     <tr key={row.id}>
                       <td style={cell}>{row.addr}</td>
-                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmt(row.rentPerM2)}</td>
+                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmt(toNum(row.rentPerM2))}</td>
                       <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{correction}%</td>
-                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Number(row.weight).toFixed(3)}</td>
+                      <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{toNum(row.weight).toFixed(3)}</td>
                       <td style={{ ...cell, textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmt(adjusted)}</td>
                     </tr>
                   );
@@ -215,9 +232,9 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
                 {finalRows.map((row) => (
                   <tr key={row.name}>
                     <td style={cell}>{row.name}</td>
-                    <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmt(row.value)} ₽</td>
-                    <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{Number(row.weight).toFixed(2)}%</td>
-                    <td style={{ ...cell, textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmt(row.value * row.weight / 100)} ₽</td>
+                    <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmt(toNum(row.value))} ₽</td>
+                    <td style={{ ...cell, textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{toNum(row.weight).toFixed(2)}%</td>
+                    <td style={{ ...cell, textAlign:'right', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{fmt(toNum(row.value) * toNum(row.weight) / 100)} ₽</td>
                   </tr>
                 ))}
                 <tr>

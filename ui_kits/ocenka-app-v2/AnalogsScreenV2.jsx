@@ -4,17 +4,45 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
   const D = window.OcenkaData;
   const requestId = request?.id || D.object?.id;
   const requestTitle = request?.object || D.object?.title || 'Объект оценки';
+  const toNum = (value, fallback = 0) => {
+    const parsed = Number(String(value ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const analogStorageKey = (id) => `ocenka.analogs.${id || 'draft'}.v1`;
+  const loadSavedAnalogs = (id) => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(analogStorageKey(id)) || 'null');
+      return saved && Array.isArray(saved.rows) ? saved : null;
+    } catch {
+      return null;
+    }
+  };
+  const initialAnalogs = loadSavedAnalogs(requestId);
 
-  const [analogRows, setAnalogRows] = React.useState(D.analogsDetailed || []);
+  const [analogRows, setAnalogRows] = React.useState(initialAnalogs?.rows || D.analogsDetailed || []);
   const [manualOpen, setManualOpen] = React.useState(false);
   const [manualDraft, setManualDraft] = React.useState({ addr:'', source:'Ручной ввод', price:0, area:0, dist:'', cond:'Хорошее' });
   const [statuses, setStatuses] = React.useState(() => {
-    const m = {};
-    D.analogsDetailed.forEach(a => { m[a.id] = a.active; });
-    return m;
+    if (initialAnalogs?.statuses) return initialAnalogs.statuses;
+    return (D.analogsDetailed || []).reduce((acc, analog) => ({ ...acc, [analog.id]: analog.active }), {});
   });
+  const [loadedRequestId, setLoadedRequestId] = React.useState(requestId);
   const [selectedId, setSelectedId] = React.useState(null);
   const selected = analogRows.find(a => a.id === selectedId);
+  React.useEffect(() => {
+    const saved = loadSavedAnalogs(requestId);
+    const rows = saved?.rows || D.analogsDetailed || [];
+    setAnalogRows(rows);
+    setStatuses(saved?.statuses || rows.reduce((acc, analog) => ({ ...acc, [analog.id]: analog.active }), {}));
+    setSelectedId(null);
+    setLoadedRequestId(requestId);
+  }, [requestId]);
+  React.useEffect(() => {
+    if (loadedRequestId !== requestId) return;
+    try {
+      window.localStorage.setItem(analogStorageKey(requestId), JSON.stringify({ rows: analogRows, statuses }));
+    } catch {}
+  }, [requestId, loadedRequestId, analogRows, statuses]);
 
   const toggleStatus = (id) => setStatuses(s => ({ ...s, [id]: !s[id] }));
   const activateAll = () => {
@@ -23,9 +51,11 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
   };
   const addManualAnalog = (event) => {
     event.preventDefault();
-    if (!manualDraft.addr.trim() || !manualDraft.price || !manualDraft.area) return;
+    const price = toNum(manualDraft.price);
+    const area = toNum(manualDraft.area);
+    if (!manualDraft.addr.trim() || price <= 0 || area <= 0) return;
     const id = `AN-${String(analogRows.length + 1).padStart(3, '0')}`;
-    const perM2 = Math.round(Number(manualDraft.price) / Number(manualDraft.area));
+    const perM2 = Math.round(price / area);
     const next = {
       id,
       addr: manualDraft.addr.trim(),
@@ -33,8 +63,8 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
       source: manualDraft.source.trim() || 'Ручной ввод',
       url: '',
       active: true,
-      price: Number(manualDraft.price),
-      area: Number(manualDraft.area),
+      price,
+      area,
       perM2,
       dist: manualDraft.dist.trim() || '—',
       cond: manualDraft.cond.trim() || 'Хорошее',
@@ -43,7 +73,7 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
       wallMaterial: '—',
       plotArea: '—',
       adj: '0%',
-      final: Number(manualDraft.price).toLocaleString('ru-RU'),
+      final: price.toLocaleString('ru-RU'),
       comp: 'mid',
       description: 'Аналог добавлен вручную для предварительного расчета.',
       photos: 0,
@@ -68,6 +98,44 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
       {children}
     </th>
   );
+  const activeAnalogs = analogRows.filter((analog) => statuses[analog.id] !== false);
+  const avgPerM2 = activeAnalogs.length
+    ? Math.round(activeAnalogs.reduce((sum, analog) => sum + toNum(analog.perM2), 0) / activeAnalogs.length)
+    : 0;
+  const adjustedValues = activeAnalogs.map((analog) => {
+    const raw = String(analog.final || '').replace(/\s+/g, '').replace(/[^\d.-]/g, '');
+    return toNum(raw) || toNum(analog.price) || 0;
+  }).filter(Boolean);
+  const avgAdjusted = adjustedValues.length
+    ? Math.round(adjustedValues.reduce((sum, value) => sum + value, 0) / adjustedValues.length)
+    : 0;
+  const highComparableCount = activeAnalogs.filter((analog) => analog.comp === 'high').length;
+  const sendToCalculation = () => {
+    if (!activeAnalogs.length) {
+      if (toast) toast('Нет активных аналогов для переноса');
+      return;
+    }
+    try {
+      const key = `ocenka.calculation.${requestId || 'draft'}.v1`;
+      const saved = JSON.parse(window.localStorage.getItem(key) || 'null') || {};
+      const area = toNum(window.OcenkaData.calculation?.subjectArea, 214.6) || 214.6;
+      const rows = activeAnalogs.slice(0, 5).map((analog, index) => ({
+        id: analog.id,
+        name: analog.addr,
+        src: analog.source,
+        price: toNum(analog.price) || avgAdjusted,
+        area: toNum(analog.area) || area,
+        adjTorg: 0,
+        adjLoc: 0,
+        adjRep: 0,
+        adjFlr: 0,
+        w: index === 0 ? 40 : 30,
+      }));
+      window.localStorage.setItem(key, JSON.stringify({ ...saved, rows }));
+      if (toast) toast('Аналоги перенесены в расчет');
+    } catch {}
+    onNavigate('calc');
+  };
 
   return (
     <div>
@@ -81,9 +149,9 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:20 }}>
         {[
           { l:'Найдено аналогов',        v:String(analogRows.length),          i:'git-compare',  t:'brand' },
-          { l:'Средняя цена за м²',      v:'119 559 ₽',  i:'ruler',        t:'brand' },
+          { l:'Средняя цена за м²',      v:`${avgPerM2.toLocaleString('ru-RU')} ₽`,  i:'ruler',        t:'brand' },
           { l:'Радиус поиска',           v:'4.0 км',     i:'map-pin',      t:'brand' },
-          { l:'Высокая сопоставимость',  v:'2',          i:'badge-check',  t:'accent' },
+          { l:'Высокая сопоставимость',  v:String(highComparableCount),          i:'badge-check',  t:'accent' },
         ].map((s, i) => <NS.KpiCard key={i} label={s.l} value={s.v} icon={<Icon n={s.i} size={18} />} iconTone={s.t} />)}
       </div>
 
@@ -114,9 +182,9 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
                       </div>
                       <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>{a.source}</div>
                     </td>
-                    <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', textAlign:'right', fontSize:'var(--text-sm)' }}>{(a.price/1e6).toFixed(1)} млн</td>
+                    <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', textAlign:'right', fontSize:'var(--text-sm)' }}>{(toNum(a.price)/1e6).toFixed(1)} млн</td>
                     <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', textAlign:'right', fontSize:'var(--text-sm)' }}>{a.area} м²</td>
-                    <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', textAlign:'right', fontSize:'var(--text-sm)' }}>{Math.round(a.perM2/1000)} тыс.</td>
+                    <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', textAlign:'right', fontSize:'var(--text-sm)' }}>{Math.round(toNum(a.perM2)/1000)} тыс.</td>
                     <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', fontSize:'var(--text-sm)' }}>{a.dist}</td>
                     <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', fontSize:'var(--text-sm)' }}>{a.cond}</td>
                     <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', textAlign:'right', fontWeight:600, fontSize:'var(--text-sm)', color: a.adj.startsWith('−') ? 'var(--danger-text)' : 'var(--success-text)' }}>{a.adj}</td>
@@ -131,8 +199,8 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px', background:'var(--surface-inset)' }}>
           <span style={{ fontSize:'var(--text-sm)', color:'var(--text-muted)' }}>Средняя скорр. стоимость</span>
           <div style={{ display:'flex', alignItems:'center', gap:16 }}>
-            <span style={{ fontSize:'var(--text-xl)', fontWeight:700, color:'var(--text-value)', fontVariantNumeric:'tabular-nums' }}>23 207 300 ₽</span>
-            <Button variant="primary" iconRight={<Icon n="arrow-right" size={15} />} onClick={() => onNavigate('calc')}>В расчет</Button>
+            <span style={{ fontSize:'var(--text-xl)', fontWeight:700, color:'var(--text-value)', fontVariantNumeric:'tabular-nums' }}>{avgAdjusted.toLocaleString('ru-RU')} ₽</span>
+            <Button variant="primary" iconRight={<Icon n="arrow-right" size={15} />} onClick={sendToCalculation}>В расчет</Button>
           </div>
         </div>
       </Card>
@@ -164,8 +232,8 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
             <div className="ds-scroll" style={{ flex:1, overflowY:'auto', padding:24 }}>
 
               {/* Photos placeholder */}
-              <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.min(selected.photos, 4)}, 1fr)`, gap:10, marginBottom:24 }}>
-                {Array.from({ length: Math.min(selected.photos, 4) }).map((_, i) => (
+              <div style={{ display:'grid', gridTemplateColumns:`repeat(${Math.max(1, Math.min(toNum(selected.photos), 4))}, 1fr)`, gap:10, marginBottom:24 }}>
+                {Array.from({ length: Math.min(toNum(selected.photos), 4) }).map((_, i) => (
                   <div key={i} style={{ aspectRatio:'4/3', background:'var(--surface-sunken)', borderRadius:'var(--radius-md)', border:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:6, color:'var(--text-subtle)' }}>
                     <Icon n="image" size={26} />
                     <span style={{ fontSize:'var(--text-xs)' }}>Фото {i+1}</span>
@@ -190,12 +258,12 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
                   <div style={{ fontSize:'var(--text-xs)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--text-muted)', marginBottom:14 }}>Ценовые показатели</div>
                   <div style={{ padding:'16px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)', marginBottom:12 }}>
                     <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:600 }}>Цена предложения</div>
-                    <div style={{ fontSize:'var(--text-3xl)', fontWeight:700, color:'var(--text-strong)', fontVariantNumeric:'tabular-nums', marginTop:4 }}>{(selected.price/1e6).toFixed(1)} млн ₽</div>
+                    <div style={{ fontSize:'var(--text-3xl)', fontWeight:700, color:'var(--text-strong)', fontVariantNumeric:'tabular-nums', marginTop:4 }}>{(toNum(selected.price)/1e6).toFixed(1)} млн ₽</div>
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                     <div style={{ padding:'10px 14px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)' }}>
                       <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:600 }}>Цена за м²</div>
-                      <div style={{ fontSize:'var(--text-md)', fontWeight:700, color:'var(--text-strong)', marginTop:2 }}>{selected.perM2.toLocaleString('ru')} ₽</div>
+                      <div style={{ fontSize:'var(--text-md)', fontWeight:700, color:'var(--text-strong)', marginTop:2 }}>{toNum(selected.perM2).toLocaleString('ru')} ₽</div>
                     </div>
                     <div style={{ padding:'10px 14px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)' }}>
                       <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:600 }}>Расстояние</div>
@@ -215,16 +283,16 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:'var(--text-xs)', fontWeight:700, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--text-muted)', marginBottom:10 }}>Применённые поправки</div>
                 <div style={{ border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-md)', overflow:'hidden' }}>
-                  {selected.adjRows.map((r, i) => (
-                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'11px 16px', borderBottom: i < selected.adjRows.length - 1 ? '1px solid var(--divider)' : 'none', fontSize:'var(--text-sm)' }}>
+                  {(selected.adjRows || []).map((r, i) => (
+                    <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'11px 16px', borderBottom: i < (selected.adjRows || []).length - 1 ? '1px solid var(--divider)' : 'none', fontSize:'var(--text-sm)' }}>
                       <span style={{ color:'var(--text-body)' }}>{r.factor}</span>
-                      <span style={{ fontWeight:600, color: r.pct < 0 ? 'var(--danger-text)' : 'var(--success-text)', fontVariantNumeric:'tabular-nums' }}>{r.pct > 0 ? '+' : ''}{r.pct}%</span>
+                      <span style={{ fontWeight:600, color: toNum(r.pct) < 0 ? 'var(--danger-text)' : 'var(--success-text)', fontVariantNumeric:'tabular-nums' }}>{toNum(r.pct) > 0 ? '+' : ''}{toNum(r.pct)}%</span>
                     </div>
                   ))}
                   <div style={{ display:'flex', justifyContent:'space-between', padding:'11px 16px', background:'var(--surface-inset)', fontSize:'var(--text-sm)', fontWeight:700 }}>
                     <span>Скорр. цена за м²</span>
                     <span style={{ color:'var(--text-strong)', fontVariantNumeric:'tabular-nums' }}>
-                      {Math.round(selected.perM2 * (1 + selected.adjRows.reduce((s, r) => s + r.pct, 0) / 100)).toLocaleString('ru')} ₽
+                      {Math.round(toNum(selected.perM2) * (1 + (selected.adjRows || []).reduce((s, r) => s + toNum(r.pct), 0) / 100)).toLocaleString('ru')} ₽
                     </span>
                   </div>
                 </div>

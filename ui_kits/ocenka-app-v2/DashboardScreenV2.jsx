@@ -10,6 +10,17 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
       return D.requests || [];
     }
   })();
+  const activeCount = requests.filter((request) => request.status !== 'ready').length;
+  const readyCount = requests.filter((request) => request.status === 'ready').length;
+  const reviewCount = requests.filter((request) => request.status === 'review').length;
+  const newCount = requests.filter((request) => request.status === 'new').length;
+  const dashboardKpis = [
+    { label:'Заявок всего', value:String(requests.length), icon:'clipboard-list', tone:'brand', helper:'актуальная доска' },
+    { label:'В работе', value:String(activeCount), icon:'activity', tone:'brand', helper:'без готовых' },
+    { label:'Новые', value:String(newCount), icon:'inbox', tone:'warning', helper:'ожидают разбора' },
+    { label:'На проверке', value:String(reviewCount), icon:'shield-check', tone:'accent', helper:'контроль качества' },
+    { label:'Готово', value:String(readyCount), icon:'circle-check-big', tone:'accent', helper:'отчеты готовы' },
+  ];
 
   return (
     <div>
@@ -19,10 +30,9 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
         background: 'var(--blue-900)', borderRadius: 'var(--radius-xl)',
         padding: '28px 32px', marginBottom: 24,
       }}>
-        <div style={{ position: 'absolute', right: -40, top: -40, width: 280, height: 280, borderRadius: '50%', background: 'radial-gradient(circle, rgba(37,168,113,.22), transparent 70%)' }} />
         <div style={{ position: 'relative', maxWidth: 640 }}>
           <div className="ds-overline" style={{ color: '#7FB0E8' }}>Рабочее пространство оценщика</div>
-          <h2 style={{ color: '#fff', fontSize: 'var(--text-3xl)', fontWeight: 800, letterSpacing: '-.02em', marginTop: 10, lineHeight: 1.15 }}>
+          <h2 style={{ color: '#fff', fontSize: 'var(--text-3xl)', fontWeight: 800, letterSpacing: 0, marginTop: 10, lineHeight: 1.15 }}>
             Автоматизируйте оценку недвижимости:<br />от заявки до готового отчета
           </h2>
           <p style={{ color: '#C7D6EC', fontSize: 'var(--text-md)', marginTop: 12, lineHeight: 1.55 }}>
@@ -43,7 +53,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
-        {D.kpis.map((k, i) => (
+        {dashboardKpis.map((k, i) => (
           <KpiCard key={i} label={k.label} value={k.value} icon={<Icon n={k.icon} size={18} />}
             iconTone={k.tone} delta={k.delta} deltaDir={k.dir} helper={k.helper} />
         ))}

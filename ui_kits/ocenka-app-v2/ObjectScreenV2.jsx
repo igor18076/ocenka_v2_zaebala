@@ -38,6 +38,10 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
   };
 
   const fileIcon = (kind) => kind === 'doc' ? 'file-text' : 'file';
+  const toNum = (value, fallback = 0) => {
+    const parsed = Number(String(value ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
   const fieldStyle = { width:'100%', boxSizing:'border-box', border:'1px solid var(--border-default)', borderRadius:'var(--radius-sm)', padding:'8px 10px', font:'inherit', color:'var(--text-strong)', background:'var(--surface-card)', outline:'none' };
   const editField = (label, key, mono) => (
     <div>
@@ -77,12 +81,12 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
     } catch {}
   }, [o, docs]);
   const savedCalculation = readSavedCalculation(o.id);
-  const summaryValue = savedCalculation.final
-    ? Math.round(savedCalculation.final).toLocaleString('ru')
+  const summaryValue = toNum(savedCalculation.final) > 0
+    ? Math.round(toNum(savedCalculation.final)).toLocaleString('ru')
     : D.result.value;
   const requiredFields = [o.title, o.address, o.type, o.area, o.floors, o.year, o.cadastral, o.purpose, o.valueType, o.date, o.client];
   const completedFields = requiredFields.filter((value) => String(value || '').trim()).length;
-  const readiness = Math.min(100, Math.round((completedFields / requiredFields.length) * 70) + Math.min(20, docs.length * 5) + (Number(o.photos) > 0 ? 10 : 0));
+  const readiness = Math.min(100, Math.round((completedFields / requiredFields.length) * 70) + Math.min(20, docs.length * 5) + (toNum(o.photos) > 0 ? 10 : 0));
   const summaryMetric = (label, value, icon, tone) => (
     <div style={{ padding:'10px 12px', background:'var(--surface-inset)', borderRadius:'var(--radius-md)', display:'flex', alignItems:'center', gap:10 }}>
       <span style={{ width:30, height:30, borderRadius:'var(--radius-sm)', background:tone || 'var(--blue-50)', color:'var(--blue-700)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -237,7 +241,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
               <div style={{ height: 1, background: 'var(--divider)' }} />
               <div>
                 <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--text-muted)' }}>Предв. рыночная стоимость</span>
-                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-value)', fontVariantNumeric: 'tabular-nums', marginTop: 6, letterSpacing: '-.01em' }}>{summaryValue} ₽</div>
+                <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-value)', fontVariantNumeric: 'tabular-nums', marginTop: 6, letterSpacing: 0 }}>{summaryValue} ₽</div>
                 <div style={{ marginTop:4, fontSize:'var(--text-xs)', color:'var(--text-muted)' }}>{savedCalculation.final ? 'из сохраненного расчета' : `диапазон ${D.result.low}–${D.result.high} ₽`}</div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>

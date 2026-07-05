@@ -19,7 +19,7 @@ window.PageHead = function PageHead({ title, subtitle, actions }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 24 }}>
       <div>
-        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-strong)', letterSpacing: '-.01em' }}>{title}</h1>
+        <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, color: 'var(--text-strong)', letterSpacing: 0 }}>{title}</h1>
         {subtitle ? <p style={{ marginTop: 6, color: 'var(--text-muted)', fontSize: 'var(--text-md)' }}>{subtitle}</p> : null}
       </div>
       {actions ? <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>{actions}</div> : null}

@@ -17,6 +17,10 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
   const [editingIndex, setEditingIndex] = React.useState(null);
   const emptyClient = { name:'', kind:'Юр. лицо', orders:0, contact:'', inn:'0000000000', legalAddress:'Юридический адрес не указан' };
   const [draft, setDraft] = React.useState(emptyClient);
+  const toInt = (value, fallback = 0) => {
+    const parsed = Number(String(value ?? '').replace(/[^\d-]/g, ''));
+    return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : fallback;
+  };
   React.useEffect(() => {
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(clients));
@@ -44,7 +48,7 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
       contact: draft.contact.trim(),
       inn: draft.inn.trim() || '0000000000',
       legalAddress: draft.legalAddress.trim() || 'Юридический адрес не указан',
-      orders: Number(draft.orders) || 0,
+      orders: toInt(draft.orders),
     };
     if (!next.name) return;
     setClients((items) => editingIndex == null
@@ -143,11 +147,17 @@ window.SettingsScreenV2 = function SettingsScreenV2({ toast }) {
     name: savedSettings.name || window.OcenkaData.user?.name || 'Игорь Дорощенко',
     registry: savedSettings.registry || '012458',
     email: savedSettings.email || 'i.doroshenko@ocenka.pro',
+    reportFormat: savedSettings.reportFormat || 'doc',
+    fsoAutocheck: savedSettings.fsoAutocheck ?? true,
+    includePhotos: savedSettings.includePhotos ?? true,
+    notifyClient: savedSettings.notifyClient ?? false,
   });
+  const setSetting = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
   const saveSettings = () => {
     try {
       window.localStorage.setItem('ocenka.settings.v1', JSON.stringify(settings));
     } catch {}
+    window.dispatchEvent(new Event('ocenka:settings-updated'));
     if (toast) toast('Настройки сохранены');
   };
   return (
@@ -156,25 +166,25 @@ window.SettingsScreenV2 = function SettingsScreenV2({ toast }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
         <Card title="Профиль оценщика">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Input label="ФИО" value={settings.name} onChange={(event) => setSettings((prev) => ({ ...prev, name:event.target.value }))} />
-            <Input label="№ в реестре СРО" value={settings.registry} onChange={(event) => setSettings((prev) => ({ ...prev, registry:event.target.value }))} mono />
+            <Input label="ФИО" value={settings.name} onChange={(event) => setSetting('name', event.target.value)} />
+            <Input label="№ в реестре СРО" value={settings.registry} onChange={(event) => setSetting('registry', event.target.value)} mono />
             <Select label="Саморегулируемая организация" options={[
               { value: 'a', label: 'СРО «Российское общество оценщиков»' },
               { value: 'b', label: 'СРО «СМАО»' },
             ]} />
-            <Input label="E-mail" value={settings.email} onChange={(event) => setSettings((prev) => ({ ...prev, email:event.target.value }))} />
+            <Input label="E-mail" value={settings.email} onChange={(event) => setSetting('email', event.target.value)} />
           </div>
         </Card>
         <Card title="Параметры отчетов">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Select label="Формат по умолчанию" options={[
+            <Select label="Формат по умолчанию" value={settings.reportFormat} onChange={(event) => setSetting('reportFormat', event.target.value)} options={[
               { value: 'doc', label: 'DOC' },
               { value: 'pdf', label: 'PDF' },
             ]} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
-              <Switch label="Автопроверка по ФСО перед формированием" defaultChecked />
-              <Switch label="Добавлять фотографии в отчет" defaultChecked />
-              <Switch label="Уведомлять заказчика по e-mail" />
+              <Switch label="Автопроверка по ФСО перед формированием" checked={settings.fsoAutocheck} onChange={(event) => setSetting('fsoAutocheck', event.target.checked)} />
+              <Switch label="Добавлять фотографии в отчет" checked={settings.includePhotos} onChange={(event) => setSetting('includePhotos', event.target.checked)} />
+              <Switch label="Уведомлять заказчика по e-mail" checked={settings.notifyClient} onChange={(event) => setSetting('notifyClient', event.target.checked)} />
             </div>
             <div style={{ paddingTop: 8 }}>
               <Button variant="primary" onClick={saveSettings}>Сохранить изменения</Button>

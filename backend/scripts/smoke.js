@@ -49,6 +49,9 @@ async function main() {
   try {
     await waitForServer();
 
+    const protectedApp = await request({ path: '/ui_kits/ocenka-app-v2/index.html', method: 'GET' });
+    assert(protectedApp.res.statusCode === 302 && protectedApp.res.headers.location === '/login', 'Protected app must redirect anonymous users to login');
+
     const loginBody = 'login=ocenka&password=ocenka123';
     const login = await request({
       path: '/login',
@@ -70,10 +73,21 @@ async function main() {
     const data = JSON.parse(dataJs.data.replace(/^window\.OcenkaData = /, '').replace(/;\s*$/, ''));
     assert(Array.isArray(data.requests) && data.requests.length > 0, 'Requests data is empty');
     assert(data.calculation?.cost?.ncsTables?.length >= 6, 'NCS tables are not loaded');
+    assert(data.user?.name === 'Игорь Дорощенко', 'Unexpected evaluator name in app data');
+    assert(data.object?.id === '03-1040', 'Default object id must use 03-* format');
+    assert(data.object?.client === 'Игорь Дорощенко', 'Default object client is not normalized');
+    assert(data.requests.every((request) => /^03-\d{4}$/.test(request.id)), 'Requests must use 03-#### ids');
+    assert(data.requests.every((request) => request.type !== 'Кадастровая'), 'Cadastral appraisal type leaked into requests');
+    assert(!JSON.stringify(data).includes('ОЗ-'), 'Legacy ОЗ-* id leaked into app data');
+    assert(!JSON.stringify(data).includes('Петров Андрей Сергеевич'), 'Old report person leaked into app data');
 
     const requestsScreen = await request({ path: '/ui_kits/ocenka-app-v2/RequestsScreenV2.jsx', headers: { cookie } });
     assert(requestsScreen.res.statusCode === 200, 'Requests screen is not available');
     assert(!/beenb|iframe|crmSrc/i.test(requestsScreen.data), 'Removed CRM embed is still referenced');
+
+    const logout = await request({ path: '/logout', method: 'POST', headers: { cookie } });
+    assert(logout.res.statusCode === 302 && logout.res.headers.location === '/login', 'Logout must redirect to login');
+    assert(logout.res.headers['set-cookie']?.[0]?.includes('Max-Age=0'), 'Logout must clear session cookie');
 
     console.log('Smoke checks passed');
   } finally {

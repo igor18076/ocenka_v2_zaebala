@@ -15,6 +15,7 @@ const port = Number(process.env.PORT || 4173);
 const sessions = new Map();
 const sessionCookieName = 'ocenka_session';
 const appPath = '/ui_kits/ocenka-app-v2/index.html';
+const secureCookie = /^(1|true|yes)$/i.test(process.env.OCENKA_COOKIE_SECURE || '');
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -76,6 +77,17 @@ function redirect(res, location, headers = {}) {
     'Cache-Control': 'no-store'
   });
   res.end();
+}
+
+function sessionCookie(value, maxAge) {
+  return [
+    `${sessionCookieName}=${encodeURIComponent(value)}`,
+    'HttpOnly',
+    'SameSite=Lax',
+    'Path=/',
+    `Max-Age=${maxAge}`,
+    secureCookie ? 'Secure' : ''
+  ].filter(Boolean).join('; ');
 }
 
 function readFormBody(req) {
@@ -318,6 +330,7 @@ function migrateDatabase() {
     if (!clientColumns.has('legal_address')) {
       db.exec("ALTER TABLE clients ADD COLUMN legal_address TEXT NOT NULL DEFAULT 'Не указан'");
     }
+    db.exec('PRAGMA foreign_keys = OFF');
     db.exec(`
       UPDATE users
       SET name = 'Игорь Дорощенко', role = 'Оценщик', initials = 'ИД', login = 'ocenka'
@@ -328,13 +341,18 @@ function migrateDatabase() {
       UPDATE requests SET owner = 'Мария Кузнецова' WHERE owner = 'Анна Смирнова';
       UPDATE requests SET owner = 'Павел Соколов' WHERE owner = 'Дмитрий Орлов';
       UPDATE requests SET type = 'Рыночная' WHERE type = 'Кадастровая';
-      UPDATE appraisal_objects SET client = 'Петров Андрей Сергеевич' WHERE id = 'ОЗ-1040';
+      UPDATE requests SET id = '03-' || substr(id, 4) WHERE id LIKE 'ОЗ-%';
+      UPDATE appraisal_objects SET id = '03-' || substr(id, 4) WHERE id LIKE 'ОЗ-%';
+      UPDATE object_documents SET object_id = '03-' || substr(object_id, 4) WHERE object_id LIKE 'ОЗ-%';
+      UPDATE analogs SET request_id = '03-' || substr(request_id, 4) WHERE request_id LIKE 'ОЗ-%';
+      UPDATE appraisal_objects SET client = 'Игорь Дорощенко' WHERE id = '03-1040';
     `);
+    db.exec('PRAGMA foreign_keys = ON');
     const details = [
       ['ПАО «Сбербанк»', '7707083893', '117997, г. Москва, ул. Вавилова, д. 19'],
       ['ВТБ Банк', '7702070139', '190000, г. Санкт-Петербург, ул. Большая Морская, д. 29'],
       ['ООО «Аркада»', '7723456789', '115054, г. Москва, ул. Валовая, д. 8, офис 12'],
-      ['Иванов Иван Петрович', '000000000000', 'Адрес регистрации не указан'],
+      ['Игорь Дорощенко', '000000000000', 'Адрес регистрации не указан'],
       ['ООО «ГеоИнвест»', '7712345678', '125040, г. Москва, Ленинградский пр-т, д. 15']
     ];
     const updateClient = db.prepare('UPDATE clients SET inn = ?, legal_address = ? WHERE name = ?');
@@ -496,7 +514,7 @@ async function handleLoginPost(req, res) {
 
   const sessionId = createSession(user);
   redirect(res, appPath, {
-    'Set-Cookie': `${sessionCookieName}=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 8}`
+    'Set-Cookie': sessionCookie(sessionId, 60 * 60 * 8)
   });
 }
 
@@ -583,7 +601,7 @@ const server = http.createServer((req, res) => {
   if ((req.method === 'GET' || req.method === 'POST') && decodedPath === '/logout') {
     clearSession(req);
     redirect(res, '/login', {
-      'Set-Cookie': `${sessionCookieName}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+      'Set-Cookie': sessionCookie('', 0)
     });
     return;
   }

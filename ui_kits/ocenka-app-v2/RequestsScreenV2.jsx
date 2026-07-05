@@ -141,10 +141,10 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
 
   const nextRequestId = () => {
     const max = requests.reduce((value, request) => {
-      const match = String(request.id || '').match(/(\d+)$/);
+      const match = String(request.id || '').match(/(\d+)\s*$/);
       return match ? Math.max(value, Number(match[1])) : value;
-    }, 1042);
-    return `ОЗ-${max + 1}`;
+    }, 1039);
+    return `03-${String(max + 1).padStart(4, '0')}`;
   };
 
   const saveRequest = (event) => {
