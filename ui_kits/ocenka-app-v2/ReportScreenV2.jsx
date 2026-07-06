@@ -47,10 +47,10 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const weights = savedCalc.weights || calc.weights || { comp:60, income:10, cost:30 };
   const applied = savedCalc.applied || calc.applied || { comp:true, income:true, cost:true };
   const rows = savedCalc.rows || calc.comparableRows || [];
-  const income = savedCalc.inc || calc.income || {};
+  const subjectArea = toNum(o.area ?? savedCalc.subjectArea ?? calc.subjectArea ?? D.object?.area, 214.6) || 214.6;
+  const income = savedCalc.inc || { ...(calc.income || {}), area: subjectArea };
   const rentRows = savedCalc.rentRows || income.rentAnalogs || [];
-  const cst = savedCalc.cst || calc.cost || {};
-  const subjectArea = toNum(savedCalc.subjectArea ?? calc.subjectArea ?? D.object?.area, 214.6) || 214.6;
+  const cst = savedCalc.cst || { ...(calc.cost || {}), m: subjectArea };
   const validRows = rows.filter((row) => toNum(row.price) > 0 && toNum(row.area) > 0);
   const compValue = validRows.length ? Math.round(validRows.reduce((sum, row) => {
     const weightSum = validRows.reduce((total, item) => total + Math.max(0, toNum(item.w)), 0) || 1;

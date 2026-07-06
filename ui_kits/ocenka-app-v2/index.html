@@ -69,6 +69,17 @@
         if (Array.isArray(rows)) {
           window.localStorage.setItem(kanbanKey, JSON.stringify(rows.map(normalizeRequestRow)));
         }
+        Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index))
+          .filter((key) => key && key.startsWith('ocenka.calculation.'))
+          .forEach((key) => {
+            try {
+              const saved = JSON.parse(window.localStorage.getItem(key) || 'null');
+              if (saved?.cst?.ncsTables) {
+                const { ncsTables, ...cost } = saved.cst;
+                window.localStorage.setItem(key, JSON.stringify({ ...saved, cst: cost }));
+              }
+            } catch {}
+          });
       } catch {}
     }
 

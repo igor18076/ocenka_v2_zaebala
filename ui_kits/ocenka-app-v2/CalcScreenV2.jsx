@@ -13,7 +13,15 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       return {};
     }
   };
+  const loadSavedObject = (id) => {
+    try {
+      return JSON.parse(window.localStorage.getItem(`ocenka.object.${id || 'draft'}.v1`) || 'null') || {};
+    } catch {
+      return {};
+    }
+  };
   const savedCalc = loadSavedCalculation(requestId);
+  const savedObject = loadSavedObject(requestId);
   const [loadedCalcId, setLoadedCalcId] = React.useState(requestId);
   const toNum = (value, fallback = 0) => {
     const parsed = Number(String(value ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
@@ -76,12 +84,15 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   };
 
   /* ── Сравнительный ─────────────────────────────────── */
-  const subjectArea = toNum(savedCalc.subjectArea ?? calc.subjectArea ?? D.object?.area, 214.6) || 214.6;
+  const subjectArea = toNum(savedObject.area ?? savedCalc.subjectArea ?? calc.subjectArea ?? D.object?.area, 214.6) || 214.6;
   const [rows, setRows] = React.useState(savedCalc.rows || calc.comparableRows || []);
   const updRow = (id, f, v) => setRows(rs => rs.map(r => r.id === id ? { ...r, [f]: v } : r));
 
   /* ── Доходный ───────────────────────────────────────── */
-  const [inc, setInc] = React.useState(savedCalc.inc || calc.income || { area:214.6, rent:800, vacancy:12, opex:35, cap:9 });
+  const incomeDefaults = { area:subjectArea, rent:800, vacancy:12, opex:35, cap:9 };
+  const seedIncome = calc.income || {};
+  const buildIncome = (saved) => saved?.inc || { ...incomeDefaults, ...seedIncome, area: subjectArea };
+  const [inc, setInc] = React.useState(buildIncome(savedCalc));
   const [rentRows, setRentRows] = React.useState(savedCalc.rentRows || calc.income?.rentAnalogs || []);
   const updRentRow = (id, f, v) => setRentRows(rs => rs.map(r => r.id === id ? { ...r, [f]: v } : r));
   const rentSources = calc.income?.sources || [];
@@ -94,14 +105,18 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   };
 
   /* ── Затратный ──────────────────────────────────────── */
-  const defaultCost = { n:95000, m:214.6, kPer:1, kReg:1, kZon:1, kSeis:1, kF:1, zd:0, kInd:1, vat:20, rateCode:'01-02-001-01' };
+  const defaultCost = { n:95000, m:subjectArea, kPer:1, kReg:1, kZon:1, kSeis:1, kF:1, zd:0, kInd:1, vat:20, rateCode:'01-02-001-01' };
   const seedCost = calc.cost || {};
+  const cleanCostParams = (params = {}) => {
+    const { ncsTables, ...rest } = params || {};
+    return rest;
+  };
   const [cst, setCst] = React.useState({
     ...defaultCost,
     ...seedCost,
-    ...(savedCalc.cst || {}),
+    ...cleanCostParams(savedCalc.cst),
     n: savedCalc.cst?.n ?? seedCost.n ?? seedCost.replaceM2 ?? defaultCost.n,
-    m: savedCalc.cst?.m ?? seedCost.m ?? seedCost.area ?? defaultCost.m,
+    m: savedCalc.cst?.m ?? subjectArea,
   });
   const ncsTables = cst.ncsTables || [];
   const [ncsTableIdx, setNcsTableIdx] = React.useState(savedCalc.ncsTableIdx || 0);
@@ -136,14 +151,15 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     setWt(saved.weights || calc.weights || { comp:60, income:10, cost:30 });
     setApp(saved.applied || calc.applied || { comp:true, income:true, cost:true });
     setRows(saved.rows || calc.comparableRows || []);
-    setInc(saved.inc || calc.income || { area:214.6, rent:800, vacancy:12, opex:35, cap:9 });
+    const objectArea = toNum(loadSavedObject(requestId).area ?? D.object?.area, 214.6) || 214.6;
+    setInc(saved.inc || { ...incomeDefaults, ...seedIncome, area: objectArea });
     setRentRows(saved.rentRows || calc.income?.rentAnalogs || []);
     setCst({
       ...defaultCost,
       ...seedCost,
-      ...(saved.cst || {}),
+      ...cleanCostParams(saved.cst),
       n: saved.cst?.n ?? seedCost.n ?? seedCost.replaceM2 ?? defaultCost.n,
-      m: saved.cst?.m ?? seedCost.m ?? seedCost.area ?? defaultCost.m,
+      m: saved.cst?.m ?? objectArea,
     });
     setNcsTableIdx(saved.ncsTableIdx || 0);
     setLoadedCalcId(requestId);
@@ -176,7 +192,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   React.useEffect(() => {
     if (loadedCalcId !== requestId) return;
     try {
-      window.localStorage.setItem(calcStorageKey(requestId), JSON.stringify({ weights, applied, rows, inc, rentRows, cst, ncsTableIdx, final }));
+      window.localStorage.setItem(calcStorageKey(requestId), JSON.stringify({ weights, applied, rows, inc, rentRows, cst: cleanCostParams(cst), ncsTableIdx, final }));
     } catch {}
   }, [requestId, loadedCalcId, weights, applied, rows, inc, rentRows, cst, ncsTableIdx, final]);
   const exportCalculation = () => {
@@ -187,7 +203,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       applied,
       comparative: { value: vComp, rows },
       income: { value: vInc, params: inc, rentAnalogs: rentRows },
-      cost: { value: vCst, params: cst },
+      cost: { value: vCst, params: cleanCostParams(cst) },
       final,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
