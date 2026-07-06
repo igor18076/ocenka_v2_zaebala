@@ -9,6 +9,7 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
     return Number.isFinite(parsed) ? parsed : fallback;
   };
   const analogStorageKey = (id) => `ocenka.analogs.${id || 'draft'}.v1`;
+  const analogOpenKey = (id) => `ocenka.analogs.open.${id || 'draft'}.v1`;
   const loadSavedAnalogs = (id) => {
     try {
       const saved = JSON.parse(window.localStorage.getItem(analogStorageKey(id)) || 'null');
@@ -34,7 +35,15 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
     const rows = saved?.rows || D.analogsDetailed || [];
     setAnalogRows(rows);
     setStatuses(saved?.statuses || rows.reduce((acc, analog) => ({ ...acc, [analog.id]: analog.active }), {}));
-    setSelectedId(null);
+    let nextSelected = null;
+    try {
+      const requestedAnalogId = window.localStorage.getItem(analogOpenKey(requestId));
+      if (requestedAnalogId && rows.some((analog) => analog.id === requestedAnalogId)) {
+        nextSelected = requestedAnalogId;
+      }
+      window.localStorage.removeItem(analogOpenKey(requestId));
+    } catch {}
+    setSelectedId(nextSelected);
     setLoadedRequestId(requestId);
   }, [requestId]);
   React.useEffect(() => {

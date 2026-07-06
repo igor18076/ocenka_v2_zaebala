@@ -49,7 +49,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const rows = savedCalc.rows || calc.comparableRows || [];
   const subjectArea = toNum(o.area ?? savedCalc.subjectArea ?? calc.subjectArea ?? D.object?.area, 214.6) || 214.6;
   const income = savedCalc.inc || { ...(calc.income || {}), area: subjectArea };
-  const rentRows = savedCalc.rentRows || income.rentAnalogs || [];
+  const rentRows = Array.isArray(savedCalc.rentRows) && savedCalc.rentRows.length ? savedCalc.rentRows : (income.rentAnalogs || calc.income?.rentAnalogs || []);
   const cst = savedCalc.cst || { ...(calc.cost || {}), m: subjectArea };
   const validRows = rows.filter((row) => toNum(row.price) > 0 && toNum(row.area) > 0);
   const compValue = validRows.length ? Math.round(validRows.reduce((sum, row) => {

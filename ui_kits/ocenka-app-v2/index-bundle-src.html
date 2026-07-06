@@ -48,7 +48,7 @@
     <text x="92" y="30" font-family="system-ui,sans-serif" font-size="11" font-weight="700" fill="#334155">Оценка PRO</text>
   </svg>
 </template>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="vendor/chart.umd.min.js"></script>
 <style>
   html, body { height: 100%; }
   body { margin: 0; background: var(--surface-app); overflow: hidden; }
@@ -62,10 +62,10 @@
 <body>
   <div id="app"></div>
 
-  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="vendor/react.development.js"></script>
+  <script src="vendor/react-dom.development.js"></script>
+  <script src="vendor/babel.min.js"></script>
+  <script src="vendor/lucide.min.js"></script>
   <script src="../../_ds_bundle.js"></script>
 
   <script src="data.js"></script>
@@ -83,6 +83,15 @@
   <script type="text/babel" src="AnalyticsScreen.jsx"></script>
 
   <script type="text/babel" data-presets="react">
+    function showBootError(error) {
+      const root = document.getElementById('app');
+      if (!root || root.childElementCount) return;
+      const message = error?.message || String(error || 'Неизвестная ошибка');
+      root.innerHTML = `<div style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#f4f7fb;color:#111827;font-family:system-ui,sans-serif;box-sizing:border-box"><div style="width:min(100%,620px);background:#fff;border:1px solid #d7dde8;border-radius:8px;padding:22px;box-shadow:0 10px 30px rgba(15,23,42,.12)"><h1 style="margin:0 0 8px;font-size:20px">Ошибка запуска приложения</h1><p style="margin:0 0 14px;color:#5b6472">Обновите страницу с очисткой кеша. Если ошибка повторится, передайте текст ниже.</p><pre style="white-space:pre-wrap;overflow:auto;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:12px;font-size:12px;color:#991b1b">${message.replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}</pre></div></div>`;
+    }
+    window.addEventListener('error', (event) => window.setTimeout(() => showBootError(event.error || event.message), 0));
+    window.addEventListener('unhandledrejection', (event) => window.setTimeout(() => showBootError(event.reason), 0));
+
     function normalizeRequestId(id) {
       return String(id || '').replace(/^ОЗ-/, '03-');
     }
@@ -116,7 +125,8 @@
             try {
               const saved = JSON.parse(window.localStorage.getItem(key) || 'null');
               if (saved?.cst?.ncsTables) {
-                const { ncsTables, ...cost } = saved.cst;
+                const cost = { ...saved.cst };
+                delete cost.ncsTables;
                 window.localStorage.setItem(key, JSON.stringify({ ...saved, cst: cost }));
               }
             } catch {}
@@ -198,7 +208,11 @@
         </React.Fragment>
       );
     }
-    ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    try {
+      ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+    } catch (error) {
+      showBootError(error);
+    }
     setTimeout(() => window.materializeIcons && window.materializeIcons(), 60);
   </script>
 </body>

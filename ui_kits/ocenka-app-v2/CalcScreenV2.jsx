@@ -31,6 +31,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const [tab, setTab]       = React.useState('comp');
   const [weights, setWt]    = React.useState(savedCalc.weights || calc.weights || { comp:60, income:10, cost:30 });
   const [applied, setApp]   = React.useState(savedCalc.applied || calc.applied || { comp:true, income:true, cost:true });
+  const [weightDraft, setWeightDraft] = React.useState({});
   const APPROACH_KEYS = ['comp', 'income', 'cost'];
   const roundWeight = (value) => Math.round(Math.max(0, Math.min(100, Number(value) || 0)) * 100) / 100;
 
@@ -66,6 +67,16 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
         .reduce((acc, k) => ({ ...acc, [k]: current[k] || 0 }), {}),
     }));
   };
+  const commitWeightDraft = (key) => {
+    const raw = weightDraft[key];
+    if (raw == null) return;
+    setWeightDraft((draft) => {
+      const next = { ...draft };
+      delete next[key];
+      return next;
+    });
+    setWeightLinked(key, toNum(raw, weights[key]));
+  };
 
   const setAppliedLinked = (key, checked) => {
     const nextApplied = { ...applied, [key]: checked };
@@ -93,7 +104,8 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const seedIncome = calc.income || {};
   const buildIncome = (saved) => saved?.inc || { ...incomeDefaults, ...seedIncome, area: subjectArea };
   const [inc, setInc] = React.useState(buildIncome(savedCalc));
-  const [rentRows, setRentRows] = React.useState(savedCalc.rentRows || calc.income?.rentAnalogs || []);
+  const buildRentRows = (saved) => Array.isArray(saved?.rentRows) && saved.rentRows.length ? saved.rentRows : (calc.income?.rentAnalogs || []);
+  const [rentRows, setRentRows] = React.useState(buildRentRows(savedCalc));
   const updRentRow = (id, f, v) => setRentRows(rs => rs.map(r => r.id === id ? { ...r, [f]: v } : r));
   const rentSources = calc.income?.sources || [];
   const rentAnalogRate = () => {
@@ -108,7 +120,8 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const defaultCost = { n:95000, m:subjectArea, kPer:1, kReg:1, kZon:1, kSeis:1, kF:1, zd:0, kInd:1, vat:20, rateCode:'01-02-001-01' };
   const seedCost = calc.cost || {};
   const cleanCostParams = (params = {}) => {
-    const { ncsTables, ...rest } = params || {};
+    const rest = { ...(params || {}) };
+    delete rest.ncsTables;
     return rest;
   };
   const [cst, setCst] = React.useState({
@@ -153,7 +166,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     setRows(saved.rows || calc.comparableRows || []);
     const objectArea = toNum(loadSavedObject(requestId).area ?? D.object?.area, 214.6) || 214.6;
     setInc(saved.inc || { ...incomeDefaults, ...seedIncome, area: objectArea });
-    setRentRows(saved.rentRows || calc.income?.rentAnalogs || []);
+    setRentRows(buildRentRows(saved));
     setCst({
       ...defaultCost,
       ...seedCost,
@@ -232,6 +245,13 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       .filter(r => toNum(r.price) > 0 && toNum(r.area) > 0)
       .map(r => (toNum(r.price)/toNum(r.area, 1)) * (1+(toNum(r.adjTorg)+toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100));
     const medM2 = m2s.length ? Math.round(m2s.reduce((a,b)=>a+b,0)/m2s.length) : 0;
+    const openAnalog = (row, index) => {
+      const analogId = String(row.id || '').startsWith('AN-') ? row.id : D.analogsDetailed?.[index]?.id;
+      if (analogId) {
+        try { window.localStorage.setItem(`ocenka.analogs.open.${requestId || 'draft'}.v1`, analogId); } catch {}
+      }
+      onNavigate('analogs');
+    };
     return (
       <div>
         {/* KPI row */}
@@ -259,9 +279,9 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
           </div>
           <div style={{ overflowX:'auto' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
-              <thead><tr><TH ch="Аналог"/><TH ch="Цена, ₽" r/><TH ch="М²" r/><TH ch="Вес" r/><TH ch="Торг %" r/><TH ch="Лок %" r/><TH ch="Ремонт %" r/><TH ch="Этаж %" r/><TH ch="₽/м² скорр." r/></tr></thead>
+              <thead><tr><TH ch="Аналог"/><TH ch="Цена, ₽" r/><TH ch="М²" r/><TH ch="Вес" r/><TH ch="Торг %" r/><TH ch="Лок %" r/><TH ch="Ремонт %" r/><TH ch="Этаж %" r/><TH ch="₽/м² скорр." r/><TH ch="" r/></tr></thead>
               <tbody>
-                {rows.map(r => {
+                {rows.map((r, rowIndex) => {
                   const totalAdj = toNum(r.adjTorg)+toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr);
                   const adj = 1 + totalAdj/100;
                   const adjM2 = toNum(r.area) > 0 ? Math.round((toNum(r.price)/toNum(r.area, 1))*adj) : 0;
@@ -282,6 +302,11 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
                       <td style={{ padding:'7px 12px', borderBottom:'1px solid var(--divider)', textAlign:'right' }}>
                         <div style={{ fontWeight:700, color:'var(--text-strong)' }}>{fmt(adjM2)}</div>
                         <div style={{ fontSize:11, fontWeight:700, color: q>=90?'var(--success-text)':q>=75?'var(--warning-text)':'var(--danger-text)' }}>{q}% HIGH</div>
+                      </td>
+                      <td style={{ padding:'5px 8px', borderBottom:'1px solid var(--divider)', textAlign:'right' }}>
+                        <button type="button" title="Открыть аналог" onClick={() => openAnalog(r, rowIndex)} style={{ border:'1px solid var(--border-subtle)', background:'var(--surface-card)', color:'var(--text-link)', borderRadius:'var(--radius-sm)', height:28, width:32, display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                          <Icon n="external-link" size={14} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -321,7 +346,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead><tr><TH ch="Аналог"/><TH ch="Цена" r/><TH ch="Пл." r/><TH ch="1 м² до" r/><TH ch="После торга" r/><TH ch="Фактор" r/><TH ch="Скорр. 1 м²" r/><TH ch="Вес" r/></tr></thead>
             <tbody>
-              {rows.map(r => {
+              {rows.map((r, rowIndex) => {
                 const m2b = toNum(r.area) > 0 ? Math.round(toNum(r.price)/toNum(r.area, 1)) : 0;
                 const aft = Math.round(m2b*(1+toNum(r.adjTorg)/100));
                 const fct = (1+(toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100).toFixed(4);
@@ -332,7 +357,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
                     <TD ch={<><b style={{color:'var(--text-strong)'}}>{r.name}</b><br/><span style={{fontSize:11,color:'var(--text-muted)'}}>{r.src}</span></>} />
                     <TD ch={fmt(r.price)+' ₽'} r /><TD ch={r.area+' м²'} r />
                     <TD ch={fmt(m2b)} r /><TD ch={fmt(aft)} r /><TD ch={fct} r />
-                    <TD ch={fmt(sc)} r bold /><TD ch={Math.round(Math.max(0,toNum(r.w))/ws*100)+'%'} r bold color="var(--blue-600)" />
+                    <TD ch={fmt(sc)} r bold /><TD ch={<button type="button" onClick={() => openAnalog(r, rowIndex)} style={{ border:'none', background:'transparent', color:'var(--blue-600)', fontWeight:700, cursor:'pointer', padding:0 }}>{Math.round(Math.max(0,toNum(r.w))/ws*100)}%</button>} r bold color="var(--blue-600)" />
                   </tr>
                 );
               })}
@@ -583,9 +608,23 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
                   min={0}
                   max={100}
                   step="0.01"
-                  value={toNum(weights[k]).toFixed(2)}
+                  value={weightDraft[k] ?? toNum(weights[k]).toFixed(2)}
                   disabled={!applied[k]}
-                  onChange={e=>setWeightLinked(k, toNum(e.target.value))}
+                  onChange={e=>setWeightDraft((draft) => ({ ...draft, [k]: e.target.value }))}
+                  onBlur={() => commitWeightDraft(k)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.currentTarget.blur();
+                    }
+                    if (event.key === 'Escape') {
+                      setWeightDraft((draft) => {
+                        const next = { ...draft };
+                        delete next[k];
+                        return next;
+                      });
+                      event.currentTarget.blur();
+                    }
+                  }}
                   style={{
                     width:64,
                     height:24,
@@ -661,7 +700,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
 
   return (
     <div>
-      <PageHead title="Расчет стоимости" subtitle={`Заявка ${requestId} · ${requestTitle} · три подхода к оценке, живой пересчет`} />
+      <PageHead title="Расчет стоимости" subtitle={`Заявка ${requestId} · ${requestTitle}`} />
 
       {/* Sub-tabs */}
       <div style={{ display:'flex', gap:2, background:'var(--surface-inset)', padding:4, borderRadius:'var(--radius-lg)', marginBottom:20, width:'fit-content' }}>
