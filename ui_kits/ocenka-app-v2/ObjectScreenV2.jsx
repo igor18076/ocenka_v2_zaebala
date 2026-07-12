@@ -112,14 +112,14 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
 
       <PageHead title={o.title} subtitle={o.address}
         actions={[
-          <Button key="e" variant={editMode ? 'primary' : 'secondary'} iconLeft={<Icon n={editMode ? 'save' : 'pencil'} size={16} />} onClick={() => {
+          <span key="e-wrap" data-tour-id="object-edit"><Button key="e" variant={editMode ? 'primary' : 'secondary'} iconLeft={<Icon n={editMode ? 'save' : 'pencil'} size={16} />} onClick={() => {
             setTab('params');
             if (editMode) saveObject();
             else {
               setDraftObject(o);
               setEditMode(true);
             }
-          }}>{editMode ? 'Сохранить объект' : 'Редактировать'}</Button>,
+          }}>{editMode ? 'Сохранить объект' : 'Редактировать'}</Button></span>,
           <Button key="c" variant="primary" iconLeft={<Icon n="calculator" size={16} />} onClick={() => onNavigate('calc')}>Перейти к расчету</Button>,
         ]} />
 
@@ -132,7 +132,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
       <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 20, alignItems: 'start' }}>
         <div>
           <Card noBodyPad>
-            <div style={{ padding: '6px 16px 0' }}>
+            <div data-tour-id="object-tabs" style={{ padding: '6px 16px 0' }}>
               <Tabs value={tab} onChange={setTab} items={[
                 { value: 'params', label: 'Параметры' },
                 { value: 'docs', label: 'Документы', count: docs.length },

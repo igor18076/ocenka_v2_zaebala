@@ -49,7 +49,7 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
       borderBottom: '1px solid var(--border-subtle)',
     }}>
       {/* Search */}
-      <div style={{ flex: 1, maxWidth: 460 }}>
+      <div data-tour-id="topbar-search" style={{ flex: 1, maxWidth: 460 }}>
         <div className="ock-input" style={{ background: 'var(--surface-inset)', border: '1px solid transparent' }}>
           <span className="ock-input__affix"><Icon n="search" size={17} /></span>
           <input
@@ -72,16 +72,18 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
 
       <div style={{ flex: 1 }} />
 
-      <Button variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={onNewAppraisal}>Новая оценка</Button>
+      <span data-tour-id="topbar-new">
+        <Button variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={onNewAppraisal}>Новая оценка</Button>
+      </span>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <IconButton aria-label="Уведомления" onClick={() => setMenu(menu === 'notifications' ? null : 'notifications')}><Icon n="bell" size={18} /></IconButton>
-        <IconButton aria-label="Помощь" onClick={() => setMenu(menu === 'help' ? null : 'help')}><Icon n="circle-help" size={18} /></IconButton>
+        <span data-tour-id="topbar-help"><IconButton aria-label="Помощь" onClick={() => setMenu(menu === 'help' ? null : 'help')}><Icon n="circle-help" size={18} /></IconButton></span>
       </div>
 
       <div style={{ width: 1, height: 28, background: 'var(--divider)' }} />
 
-      <button onClick={() => setMenu(menu === 'profile' ? null : 'profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 'var(--radius-md)' }}>
+      <button data-tour-id="profile-menu" onClick={() => setMenu(menu === 'profile' ? null : 'profile')} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 6px', borderRadius: 'var(--radius-md)' }}>
         <Avatar name={user.name} />
         <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
           <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-strong)' }}>{user.name}</div>
@@ -110,6 +112,7 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
               <div style={{ fontWeight:800, color:'var(--text-strong)', margin:'2px 4px 10px' }}>Помощь</div>
               <div style={panelItem}>Enter в поиске открывает заявки и применяет фильтр.</div>
               <div style={panelItem}>Карточки заявок можно перетаскивать между колонками.</div>
+              <Button variant="secondary" block iconLeft={<Icon n="route" size={15} />} onClick={() => { setMenu(null); window.dispatchEvent(new Event('ocenka:start-onboarding')); }}>Пройти обучение</Button>
               <Button variant="secondary" block onClick={() => { setMenu(null); window.ocenkaGoTo && window.ocenkaGoTo('fso'); }}>Открыть проверку ФСО</Button>
             </React.Fragment>
           ) : null}
@@ -123,6 +126,7 @@ window.TopbarV2 = function TopbarV2({ onNewAppraisal }) {
                 </div>
               </div>
               <Button variant="secondary" block onClick={() => { setMenu(null); window.ocenkaGoTo && window.ocenkaGoTo('settings'); }}>Настройки профиля</Button>
+              <Button variant="ghost" block iconLeft={<Icon n="route" size={15} />} onClick={() => { setMenu(null); window.dispatchEvent(new Event('ocenka:start-onboarding')); }}>Пройти обучение</Button>
               <form method="post" action="/logout" style={{ marginTop:8 }}>
                 <Button variant="ghost" block iconLeft={<Icon n="log-out" size={15} />}>Выйти</Button>
               </form>

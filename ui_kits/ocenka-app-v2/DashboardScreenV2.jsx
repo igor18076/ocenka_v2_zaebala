@@ -25,7 +25,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
   return (
     <div>
       {/* Hero */}
-      <div style={{
+      <div data-tour-id="dashboard-hero" style={{
         position: 'relative', overflow: 'hidden',
         background: 'var(--blue-900)', borderRadius: 'var(--radius-xl)',
         padding: '28px 32px', marginBottom: 24,
@@ -51,8 +51,25 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
         </div>
       </div>
 
+      <div data-tour-id="getting-started" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:14, marginBottom:24 }}>
+        {[
+          { title:'Создать заявку', text:'Открыть форму новой оценки', icon:'plus', action:() => { onNavigate('requests'); window.setTimeout(() => window.dispatchEvent(new Event('ocenka:create-request')), 0); } },
+          { title:'Открыть доску', text:'Посмотреть этапы всех заявок', icon:'columns-3', action:() => onNavigate('requests') },
+          { title:'Проверить объект', text:'Уточнить параметры и документы', icon:'home', action:() => { if (requests[0]) onOpenRequest(requests[0]); else onNavigate('objects'); } },
+          { title:'Сформировать отчет', text:'Перейти к выгрузке результата', icon:'file-check', action:() => onNavigate('reports') },
+        ].map((item) => (
+          <button key={item.title} onClick={item.action} style={{ textAlign:'left', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:14, cursor:'pointer', display:'flex', gap:12, alignItems:'flex-start', fontFamily:'var(--font-sans)' }}>
+            <span style={{ width:32, height:32, borderRadius:'var(--radius-sm)', background:'var(--blue-50)', color:'var(--blue-700)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon n={item.icon} size={16} /></span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ display:'block', color:'var(--text-strong)', fontSize:'var(--text-sm)', fontWeight:800 }}>{item.title}</span>
+              <span style={{ display:'block', marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.4 }}>{item.text}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div data-tour-id="dashboard-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
         {dashboardKpis.map((k, i) => (
           <KpiCard key={i} label={k.label} value={k.value} icon={<Icon n={k.icon} size={18} />}
             iconTone={k.tone} delta={k.delta} deltaDir={k.dir} helper={k.helper} />
@@ -60,6 +77,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
       </div>
 
       {/* Recent requests */}
+      <div data-tour-id="dashboard-requests">
       <Card noBodyPad
         title="Последние заявки"
         actions={<Button variant="ghost" size="sm" iconRight={<Icon n="arrow-right" size={15} />} onClick={() => onNavigate('requests')}>Все заявки</Button>}>
@@ -80,6 +98,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
           ]}
           rows={requests.slice(0, 5)} />
       </Card>
+      </div>
     </div>
   );
 };

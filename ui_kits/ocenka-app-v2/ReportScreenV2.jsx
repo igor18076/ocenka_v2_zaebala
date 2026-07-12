@@ -163,7 +163,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
                 <DetailField label="Объем отчета" value={`≈ ${toNum(report.pageCount) + (settings.includePhotos === false ? 0 : Math.ceil(toNum(o.photos) / 3))} страниц`} />
               </div>
 
-              <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
+              <div data-tour-id="report-actions" style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
                 <Button variant="primary" iconLeft={<Icon n="download" size={16} />} onClick={downloadDefault}>Скачать по умолчанию</Button>
                 <Button variant="primary" iconLeft={<Icon n="file-text" size={16} />} onClick={downloadDoc}>Скачать DOC</Button>
                 <Button variant="secondary" iconLeft={<Icon n="file-down" size={16} />} onClick={openPdfPrint}>Скачать PDF</Button>

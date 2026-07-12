@@ -233,6 +233,7 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
       </div>
 
       {/* Charts row 1 */}
+      <div data-tour-id="analytics-charts">
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
         <ChartBox title="Средняя цена за м² по районам, тыс. ₽"    chartType="bar" labels={distC.labels}  values={distC.values}  horizontal />
         <ChartBox title="Средняя цена за м² по классу объекта, тыс. ₽" chartType="bar" labels={classC.labels} values={classC.values} />
@@ -324,6 +325,7 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
             </table>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Objects table */}

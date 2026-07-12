@@ -67,25 +67,32 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
   return (
     <div>
       <PageHead title="Клиенты" subtitle="Заказчики оценки и история обращений"
-        actions={<Button variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={openCreate}>Добавить клиента</Button>} />
+        actions={<span data-tour-id="clients-add"><Button variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={openCreate}>Добавить клиента</Button></span>} />
       <Card noBodyPad>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--divider)', width: 280 }}>
           <Input size="sm" prefix={<Icon n="search" size={16} />} placeholder="Поиск клиента" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
-        <Table numeric columns={[
-          { key: 'name', header: 'Клиент', render: (r) => (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-              <Avatar name={r.name} size="sm" />
-              <span style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{r.name}</span>
-            </span>
-          ) },
-          { key: 'kind', header: 'Тип', render: (r) => <Badge tone={r.kind === 'Юр. лицо' ? 'brand' : 'neutral'}>{r.kind}</Badge> },
-          { key: 'inn', header: 'ИНН', render: (r) => <span className="ds-mono" style={{ fontSize: 'var(--text-sm)' }}>{r.inn}</span> },
-          { key: 'legalAddress', header: 'Юр. адрес', render: (r) => <span style={{ display:'block', maxWidth:260, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{r.legalAddress}</span> },
-          { key: 'orders', header: 'Заказов', align: 'right' },
-          { key: 'contact', header: 'Контакт', render: (r) => <span className="ds-mono" style={{ fontSize: 'var(--text-sm)' }}>{r.contact}</span> },
-          { key: 'edit', header: '', align: 'right', render: (r) => <Button variant="ghost" size="sm" iconLeft={<Icon n="pencil" size={14} />} onClick={() => openEdit(r)}>Редактировать</Button> },
-        ]} rows={filtered} />
+        <div className="ock-table-scroll">
+          <Table numeric columns={[
+            { key: 'name', header: 'Клиент', render: (r) => (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+                <Avatar name={r.name} size="sm" />
+                <span style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{r.name}</span>
+              </span>
+            ) },
+            { key: 'kind', header: 'Тип', render: (r) => <Badge tone={r.kind === 'Юр. лицо' ? 'brand' : 'neutral'}>{r.kind}</Badge> },
+            { key: 'inn', header: 'ИНН', render: (r) => <span className="ds-mono" style={{ fontSize: 'var(--text-sm)' }}>{r.inn}</span> },
+            { key: 'legalAddress', header: 'Юр. адрес', render: (r) => <span title={r.legalAddress} style={{ display:'block', maxWidth:220, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{r.legalAddress}</span> },
+            { key: 'orders', header: 'Заказов', align: 'right' },
+            { key: 'contact', header: 'Контакт', render: (r) => <span className="ds-mono" title={r.contact} style={{ display:'block', maxWidth:150, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontSize: 'var(--text-sm)' }}>{r.contact}</span> },
+            { key: 'edit', header: '', align: 'right', render: (r) => (
+              <button type="button" title="Редактировать" aria-label="Редактировать клиента" onClick={() => openEdit(r)}
+                style={{ width:32, height:32, border:'none', borderRadius:'var(--radius-sm)', background:'transparent', color:'var(--text-link)', display:'inline-flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <Icon n="pencil" size={15} />
+              </button>
+            ) },
+          ]} rows={filtered} />
+        </div>
       </Card>
       {modalOpen ? (
         <div style={{ position:'fixed', inset:0, zIndex:60, background:'rgba(15, 23, 42, .42)', display:'grid', placeItems:'center', padding:24 }} onMouseDown={() => setModalOpen(false)}>
@@ -109,7 +116,7 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
                     <option value="Физ. лицо">Физ. лицо</option>
                   </select>
                 </div>
-                <Input label="ИНН" value={draft.inn} onChange={(event) => setDraft((prev) => ({ ...prev, inn:event.target.value }))} mono />
+                <Input label="ИНН" value={draft.inn} onChange={(event) => setDraft((prev) => ({ ...prev, inn:event.target.value }))} style={{ fontFamily:'var(--font-mono)' }} />
               </div>
               <Input label="Контакт" value={draft.contact} onChange={(event) => setDraft((prev) => ({ ...prev, contact:event.target.value }))} />
               <div>
@@ -164,10 +171,11 @@ window.SettingsScreenV2 = function SettingsScreenV2({ toast }) {
     <div>
       <PageHead title="Настройки" subtitle="Профиль оценщика и параметры формирования отчетов" />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+        <div data-tour-id="settings-profile">
         <Card title="Профиль оценщика">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Input label="ФИО" value={settings.name} onChange={(event) => setSetting('name', event.target.value)} />
-            <Input label="№ в реестре СРО" value={settings.registry} onChange={(event) => setSetting('registry', event.target.value)} mono />
+            <Input label="№ в реестре СРО" value={settings.registry} onChange={(event) => setSetting('registry', event.target.value)} style={{ fontFamily:'var(--font-mono)' }} />
             <Select label="Саморегулируемая организация" options={[
               { value: 'a', label: 'СРО «Российское общество оценщиков»' },
               { value: 'b', label: 'СРО «СМАО»' },
@@ -175,6 +183,7 @@ window.SettingsScreenV2 = function SettingsScreenV2({ toast }) {
             <Input label="E-mail" value={settings.email} onChange={(event) => setSetting('email', event.target.value)} />
           </div>
         </Card>
+        </div>
         <Card title="Параметры отчетов">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Select label="Формат по умолчанию" value={settings.reportFormat} onChange={(event) => setSetting('reportFormat', event.target.value)} options={[

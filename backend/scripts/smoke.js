@@ -1,4 +1,5 @@
 const http = require('node:http');
+const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
@@ -36,7 +37,50 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function validateOnboardingFiles() {
+  const appDir = path.join(rootDir, 'ui_kits', 'ocenka-app-v2');
+  const onboardingPath = path.join(appDir, 'OnboardingV2.jsx');
+  const onboarding = fs.readFileSync(onboardingPath, 'utf8');
+  const screenFiles = fs.readdirSync(appDir)
+    .filter((name) => /\.(jsx|html)$/.test(name))
+    .map((name) => fs.readFileSync(path.join(appDir, name), 'utf8'))
+    .join('\n');
+  const tourBlock = onboarding.slice(
+    onboarding.indexOf('const TOUR_STEPS = ['),
+    onboarding.indexOf('window.OcenkaTourSteps')
+  );
+  const pageHelpBlock = onboarding.slice(
+    onboarding.indexOf('const PAGE_HELP = {'),
+    onboarding.indexOf('const TOUR_STEPS = [')
+  );
+  const markerIds = new Set();
+  for (const match of screenFiles.matchAll(/data-tour-id="([^"]+)"/g)) {
+    markerIds.add(match[1]);
+  }
+
+  const routes = new Set(['dashboard', 'requests', 'objects', 'analogs', 'calc', 'reports', 'fso', 'analytics', 'clients', 'settings']);
+  const steps = [];
+  const stepPattern = /\{\s*id:\s*'([^']+)'[\s\S]*?route:\s*'([^']+)'[\s\S]*?target:\s*'([^']+)'/g;
+  for (const match of tourBlock.matchAll(stepPattern)) {
+    steps.push({ id: match[1], route: match[2], target: match[3] });
+  }
+  assert(steps.length >= 15, 'Onboarding tour must cover main app sections');
+  assert(new Set(steps.map((step) => step.id)).size === steps.length, 'Onboarding step ids must be unique');
+  for (const step of steps) {
+    assert(routes.has(step.route), `Onboarding step ${step.id} uses unknown route ${step.route}`);
+    assert(markerIds.has(step.target), `Onboarding step ${step.id} targets missing data-tour-id ${step.target}`);
+  }
+
+  const helpKeys = Array.from(pageHelpBlock.matchAll(/^\s{4}([a-z]+):\s*\{/gm)).map((match) => match[1]);
+  assert(helpKeys.length === routes.size, 'Page help must describe every main route');
+  for (const route of routes) {
+    assert(helpKeys.includes(route), `Page help is missing route ${route}`);
+  }
+}
+
 async function main() {
+  validateOnboardingFiles();
+
   const server = spawn(process.execPath, ['--no-warnings', 'backend/server.js'], {
     cwd: rootDir,
     env: { ...process.env, PORT: String(port) },
@@ -67,6 +111,8 @@ async function main() {
     const app = await request({ path: '/ui_kits/ocenka-app-v2/index.html', headers: { cookie } });
     assert(app.res.statusCode === 200, 'App HTML is not available');
     assert(app.data.includes('RequestsScreenV2.jsx'), 'App HTML does not load requests screen');
+    assert(app.data.includes('OnboardingV2.jsx'), 'App HTML does not load onboarding screen');
+    assert(app.data.includes('<ContextHelpV2 active={active} />'), 'App HTML does not render contextual page help');
 
     const dataJs = await request({ path: '/ui_kits/ocenka-app-v2/data.js', headers: { cookie } });
     assert(dataJs.res.statusCode === 200, 'Data script is not available');
@@ -84,6 +130,23 @@ async function main() {
     const requestsScreen = await request({ path: '/ui_kits/ocenka-app-v2/RequestsScreenV2.jsx', headers: { cookie } });
     assert(requestsScreen.res.statusCode === 200, 'Requests screen is not available');
     assert(!/beenb|iframe|crmSrc/i.test(requestsScreen.data), 'Removed CRM embed is still referenced');
+    assert(requestsScreen.data.includes('data-tour-id="requests-create"'), 'Requests screen has no onboarding marker for create action');
+    assert(requestsScreen.data.includes('data-tour-id="requests-board"'), 'Requests screen has no onboarding marker for kanban board');
+
+    const analogsScreen = await request({ path: '/ui_kits/ocenka-app-v2/AnalogsScreenV2.jsx', headers: { cookie } });
+    assert(analogsScreen.res.statusCode === 200, 'Analogs screen is not available');
+    assert(analogsScreen.data.includes('<TH>Учитывать</TH>'), 'Analogs screen has no explicit include/exclude column');
+    assert(analogsScreen.data.includes("active ? 'true' : 'false'"), 'Analogs include/exclude column must show true/false values');
+
+    const onboarding = await request({ path: '/ui_kits/ocenka-app-v2/OnboardingV2.jsx', headers: { cookie } });
+    assert(onboarding.res.statusCode === 200, 'Onboarding module is not available');
+    assert(onboarding.data.includes('ocenka.onboarding.v1'), 'Onboarding progress storage key is missing');
+    assert(onboarding.data.includes('ocenka:start-onboarding'), 'Onboarding relaunch event is missing');
+    assert(onboarding.data.includes('TOUR_STEPS'), 'Onboarding step configuration is missing');
+
+    const topbar = await request({ path: '/ui_kits/ocenka-app-v2/TopbarV2.jsx', headers: { cookie } });
+    assert(topbar.res.statusCode === 200, 'Topbar is not available');
+    assert(topbar.data.includes('ocenka:start-onboarding'), 'Topbar does not expose onboarding relaunch');
 
     const logout = await request({ path: '/logout', method: 'POST', headers: { cookie } });
     assert(logout.res.statusCode === 302 && logout.res.headers.location === '/login', 'Logout must redirect to login');

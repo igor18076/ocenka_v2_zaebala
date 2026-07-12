@@ -179,8 +179,8 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
   const totalActive = requests.filter((request) => request.status !== 'ready').length;
   const readyCount = requests.filter((request) => request.status === 'ready').length;
   const filterCount = [query.trim(), typeFilter !== 'all', ownerFilter !== 'all'].filter(Boolean).length;
-  const boardHeight = filtersOpen ? 'calc(100vh - 354px)' : 'calc(100vh - 268px)';
-  const columnHeight = filtersOpen ? 'calc(100vh - 364px)' : 'calc(100vh - 278px)';
+  const boardHeight = filtersOpen ? 'calc(100vh - 426px)' : 'calc(100vh - 340px)';
+  const columnHeight = filtersOpen ? 'calc(100vh - 436px)' : 'calc(100vh - 350px)';
 
   const selectStyle = {
     width:'100%',
@@ -234,7 +234,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
           <Button key="filter" variant={filtersOpen ? 'primary' : 'secondary'} iconLeft={<Icon n="sliders-horizontal" size={16} />} onClick={() => setFiltersOpen((value) => !value)}>
             Фильтры{filterCount ? ` · ${filterCount}` : ''}
           </Button>,
-          <Button key="new" variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={openCreateModal}>Новая заявка</Button>,
+          <span key="new-wrap" data-tour-id="requests-create"><Button key="new" variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={openCreateModal}>Новая заявка</Button></span>,
         ]}
       />
 
@@ -283,7 +283,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest }) {
         </div>
       ) : null}
 
-      <div style={{
+      <div data-tour-id="requests-board" style={{
         height:boardHeight,
         minHeight:filtersOpen ? 450 : 540,
         overflowX:'auto',

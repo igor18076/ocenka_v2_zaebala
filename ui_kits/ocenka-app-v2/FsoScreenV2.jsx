@@ -66,6 +66,7 @@ window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
         </Card>
 
         {/* Checklist */}
+        <div data-tour-id="fso-checklist">
         <Card title="Чек-лист соответствия" noBodyPad>
           <div>
             {items.map((it, i) => (
@@ -91,6 +92,7 @@ window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
             ))}
           </div>
         </Card>
+        </div>
       </div>
     </div>
   );

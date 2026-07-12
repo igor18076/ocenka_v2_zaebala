@@ -208,6 +208,14 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       window.localStorage.setItem(calcStorageKey(requestId), JSON.stringify({ weights, applied, rows, inc, rentRows, cst: cleanCostParams(cst), ncsTableIdx, final }));
     } catch {}
   }, [requestId, loadedCalcId, weights, applied, rows, inc, rentRows, cst, ncsTableIdx, final]);
+  React.useEffect(() => {
+    const openCalcTab = (event) => {
+      const nextTab = event.detail;
+      if (['comp', 'income', 'cost'].includes(nextTab)) setTab(nextTab);
+    };
+    window.addEventListener('ocenka:calc-tab', openCalcTab);
+    return () => window.removeEventListener('ocenka:calc-tab', openCalcTab);
+  }, []);
   const exportCalculation = () => {
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -255,7 +263,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     return (
       <div>
         {/* KPI row */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 }}>
+        <div data-tour-id="calc-summary" className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:14, marginBottom:20 }}>
           {[
             { l:'Итоговая стоимость',    v:`${fmt(final)} ₽`,                    strong:true },
             { l:'Сравнительный подход',  v:`${fmt(vComp)} ₽` },
@@ -270,15 +278,15 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
         </div>
 
         {/* Analog editor */}
-        <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
+        <div data-tour-id="calc-comp-editor" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
           <div style={{ padding:'13px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <div>
-              <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Редактор аналогов</div>
+              <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Редактор аналогов <HelpTip title="Редактор аналогов" text="Здесь можно проверить цену, площадь и поправки каждого аналога. Любое изменение сразу пересчитывает сравнительный подход." side="bottom" /></div>
               <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>Цена, площадь и поправки редактируются вручную — расчёт пересчитывается автоматически</div>
             </div>
           </div>
-          <div style={{ overflowX:'auto' }}>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
+          <div className="ock-table-scroll">
+            <table className="ock-table-wide" style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
               <thead><tr><TH ch="Аналог"/><TH ch="Цена, ₽" r/><TH ch="М²" r/><TH ch="Вес" r/><TH ch="Торг %" r/><TH ch="Лок %" r/><TH ch="Ремонт %" r/><TH ch="Этаж %" r/><TH ch="₽/м² скорр." r/><TH ch="" r/></tr></thead>
               <tbody>
                 {rows.map((r, rowIndex) => {
@@ -317,12 +325,12 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
         </div>
 
         {/* Market range */}
-        <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:'14px 20px', marginBottom:16 }}>
+        <div data-tour-id="calc-comp-market" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:'14px 20px', marginBottom:16 }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Рыночная вилка</div>
+            <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Рыночная вилка <HelpTip title="Рыночная вилка" text="Быстрая проверка диапазона цен за квадратный метр по активным аналогам. Если итог сильно выбивается, стоит проверить поправки и веса." /></div>
             <Badge tone="info">{rows.length} объектов</Badge>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12 }}>
+          <div className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:12 }}>
             {[
               { l:'Медиана 1 м²',   v:fmt(medM2) },
               { l:'Средняя 1 м²',   v:fmt(medM2) },
@@ -338,31 +346,33 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
         </div>
 
         {/* Calc rows */}
-        <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden' }}>
+        <div data-tour-id="calc-comp-rows" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden' }}>
           <div style={{ padding:'13px 20px', borderBottom:'1px solid var(--divider)' }}>
-            <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Расчётные строки сравнительного подхода</div>
+            <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Расчётные строки сравнительного подхода <HelpTip title="Расчётные строки" text="Итоговая цена 1 м² получается после торга, поправок и веса аналога. Нажмите на процент веса, чтобы открыть карточку аналога." side="bottom" /></div>
             <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>Скорр. цены аналогов после торга, поправок и весового согласования</div>
           </div>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
-            <thead><tr><TH ch="Аналог"/><TH ch="Цена" r/><TH ch="Пл." r/><TH ch="1 м² до" r/><TH ch="После торга" r/><TH ch="Фактор" r/><TH ch="Скорр. 1 м²" r/><TH ch="Вес" r/></tr></thead>
-            <tbody>
-              {rows.map((r, rowIndex) => {
-                const m2b = toNum(r.area) > 0 ? Math.round(toNum(r.price)/toNum(r.area, 1)) : 0;
-                const aft = Math.round(m2b*(1+toNum(r.adjTorg)/100));
-                const fct = (1+(toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100).toFixed(4);
-                const sc  = Math.round(m2b*(1+(toNum(r.adjTorg)+toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100));
-                const ws  = rows.reduce((s,x)=>s+Math.max(0,toNum(x.w)),0)||1;
-                return (
-                  <tr key={r.id}>
-                    <TD ch={<><b style={{color:'var(--text-strong)'}}>{r.name}</b><br/><span style={{fontSize:11,color:'var(--text-muted)'}}>{r.src}</span></>} />
-                    <TD ch={fmt(r.price)+' ₽'} r /><TD ch={r.area+' м²'} r />
-                    <TD ch={fmt(m2b)} r /><TD ch={fmt(aft)} r /><TD ch={fct} r />
-                    <TD ch={fmt(sc)} r bold /><TD ch={<button type="button" onClick={() => openAnalog(r, rowIndex)} style={{ border:'none', background:'transparent', color:'var(--blue-600)', fontWeight:700, cursor:'pointer', padding:0 }}>{Math.round(Math.max(0,toNum(r.w))/ws*100)}%</button>} r bold color="var(--blue-600)" />
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="ock-table-scroll">
+            <table className="ock-table-wide" style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead><tr><TH ch="Аналог"/><TH ch="Цена" r/><TH ch="Пл." r/><TH ch="1 м² до" r/><TH ch="После торга" r/><TH ch="Фактор" r/><TH ch="Скорр. 1 м²" r/><TH ch="Вес" r/></tr></thead>
+              <tbody>
+                {rows.map((r, rowIndex) => {
+                  const m2b = toNum(r.area) > 0 ? Math.round(toNum(r.price)/toNum(r.area, 1)) : 0;
+                  const aft = Math.round(m2b*(1+toNum(r.adjTorg)/100));
+                  const fct = (1+(toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100).toFixed(4);
+                  const sc  = Math.round(m2b*(1+(toNum(r.adjTorg)+toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100));
+                  const ws  = rows.reduce((s,x)=>s+Math.max(0,toNum(x.w)),0)||1;
+                  return (
+                    <tr key={r.id}>
+                      <TD ch={<><b style={{color:'var(--text-strong)'}}>{r.name}</b><br/><span style={{fontSize:11,color:'var(--text-muted)'}}>{r.src}</span></>} />
+                      <TD ch={fmt(r.price)+' ₽'} r /><TD ch={r.area+' м²'} r />
+                      <TD ch={fmt(m2b)} r /><TD ch={fmt(aft)} r /><TD ch={fct} r />
+                      <TD ch={fmt(sc)} r bold /><TD ch={<button type="button" onClick={() => openAnalog(r, rowIndex)} style={{ border:'none', background:'transparent', color:'var(--blue-600)', fontWeight:700, cursor:'pointer', padding:0 }}>{Math.round(Math.max(0,toNum(r.w))/ws*100)}%</button>} r bold color="var(--blue-600)" />
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -382,7 +392,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     ];
     return (
       <div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14, marginBottom:20 }}>
+        <div data-tour-id="calc-income-kpis" className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:14, marginBottom:20 }}>
           {[
             { l:'Потенц. ВД (PGI)',   v:fmt(pgi)+' ₽/год' },
             { l:'Действит. ВД (EGI)', v:fmt(egi)+' ₽/год' },
@@ -394,9 +404,9 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             </div>
           ))}
         </div>
-        <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:20, marginBottom:16 }}>
-          <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:16 }}>Параметры доходного подхода</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+        <div data-tour-id="calc-income-params" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:20, marginBottom:16 }}>
+          <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>Параметры доходного подхода <HelpTip title="Доходный подход" text="Расчёт идёт от потенциального дохода к NOI, затем NOI делится на ставку капитализации. Ставка аренды может быть введена вручную или взята из таблицы аналогов." side="bottom" /></div>
+          <div className="ock-form-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:16 }}>
             {fields.map(f => (
               <div key={f.k}>
                 <label style={{ fontSize:'var(--text-xs)', fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:6 }}>{f.l}</label>
@@ -406,16 +416,16 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
           </div>
         </div>
         {rentRows.length ? (
-          <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
+          <div data-tour-id="calc-income-rent" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
             <div style={{ padding:'13px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', gap:12, alignItems:'center' }}>
               <div>
-                <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Таблица 6 · Подбор аналогов по аренде за 1 м²</div>
+                <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Таблица 6 · Подбор аналогов по аренде за 1 м² <HelpTip title="Арендные аналоги" text="Ставки аренды корректируются по локации и состоянию, затем согласуются по весам. Вес вводится в долях: например 0,001." side="bottom" /></div>
                 <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>Весовой коэффициент указан в долях, например 0,001</div>
               </div>
               <Button variant="secondary" size="sm" onClick={() => { setInc((p) => ({ ...p, rent: rentAnalogRate() })); if (toast) toast('Арендная ставка применена'); }}>Применить ставку {fmt(rentAnalogRate())} ₽/м²</Button>
             </div>
-            <div style={{ overflowX:'auto' }}>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <div className="ock-table-scroll">
+              <table className="ock-table-wide" style={{ width:'100%', borderCollapse:'collapse' }}>
                 <thead><tr><TH ch="Аналог"/><TH ch="Источник"/><TH ch="Ставка, ₽/м²" r/><TH ch="Площадь" r/><TH ch="Локация %" r/><TH ch="Состояние %" r/><TH ch="Вес" r/><TH ch="Скорр. ставка" r/></tr></thead>
                 <tbody>
                   {rentRows.map((row) => {
@@ -449,7 +459,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             </div>
           </div>
         ) : null}
-        <div style={{ background:'var(--emerald-50)', border:'1.5px solid var(--emerald-300)', borderRadius:'var(--radius-lg)', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div data-tour-id="calc-income-final" style={{ background:'var(--emerald-50)', border:'1.5px solid var(--emerald-300)', borderRadius:'var(--radius-lg)', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontWeight:600, color:'var(--emerald-700)' }}>Стоимость по доходному подходу</div>
             <div style={{ fontSize:'var(--text-xs)', color:'var(--emerald-600)', marginTop:3 }}>NOI {fmt(noi)} ₽ / ставка {toNum(inc.cap)}%</div>
@@ -482,15 +492,15 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     ];
     return (
       <div>
-        <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:20, marginBottom:16 }}>
+        <div data-tour-id="calc-cost-params" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:20, marginBottom:16 }}>
           <div style={{ display:'flex', justifyContent:'space-between', gap:16, alignItems:'flex-start', marginBottom:16 }}>
             <div>
-              <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Параметры затратного подхода по НЦС</div>
+              <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Параметры затратного подхода по НЦС <HelpTip title="Затратный подход" text="Базовый показатель НЦС умножается на площадь и коэффициенты, затем добавляются дополнительные затраты, индекс-дефлятор и НДС." side="bottom" /></div>
               <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:3 }}>C = [(N × M × Kper × Kreg × Kzon × Kseis × Kf) + Zd] × Kind × (1 + НДС / 100)</div>
             </div>
             <Badge tone="info">{cst.rateCode}</Badge>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
+          <div className="ock-form-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:16 }}>
             {fields.map(f => (
               <div key={f.k}>
                 <label style={{ fontSize:'var(--text-xs)', fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:6 }}>{f.l}</label>
@@ -499,7 +509,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             ))}
           </div>
         </div>
-        <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
+        <div data-tour-id="calc-cost-breakdown" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginBottom:16 }}>
           {[
             [`N × M (${fmt(toNum(cst.n))} ₽/м² × ${toNum(cst.m)} м²)`, fmt(base), 'var(--text-strong)'],
             [`Коэффициенты Kper × Kreg × Kzon × Kseis × Kf`, coef.toFixed(4), 'var(--blue-700)', ''],
@@ -514,7 +524,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             </div>
           ))}
         </div>
-        <div style={{ background:'var(--blue-50)', border:'1.5px solid var(--blue-300)', borderRadius:'var(--radius-lg)', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div data-tour-id="calc-cost-final" style={{ background:'var(--blue-50)', border:'1.5px solid var(--blue-300)', borderRadius:'var(--radius-lg)', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontWeight:600, color:'var(--blue-700)' }}>Стоимость по затратному подходу</div>
             <div style={{ fontSize:'var(--text-xs)', color:'var(--blue-600)', marginTop:3 }}>НЦС · Сборник № 01 · расценка {cst.rateCode}</div>
@@ -523,10 +533,10 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
         </div>
 
         {ncsTables.length ? (
-          <div style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginTop:16 }}>
+          <div data-tour-id="calc-cost-ncs" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', overflow:'hidden', marginTop:16 }}>
             <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', gap:16, alignItems:'flex-start' }}>
               <div>
-                <div style={{ fontWeight:600, color:'var(--text-strong)' }}>Таблицы НЦС из файла</div>
+                <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Таблицы НЦС из файла <HelpTip title="Таблицы НЦС" text="Клик по строке подставляет нужный показатель или коэффициент в формулу затратного подхода, если таблица связана с параметром." side="bottom" /></div>
                 <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>
                   {ncsTables[ncsTableIdx]?.source} · выбор строки подставляет {ncsTargetLabel[ncsTables[ncsTableIdx]?.targetField] || 'коэффициент'} в формулу
                 </div>
@@ -551,8 +561,8 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             <div style={{ padding:'12px 20px', fontWeight:600, color:'var(--text-strong)', borderBottom:'1px solid var(--divider)' }}>
               {ncsTables[ncsTableIdx]?.title}
             </div>
-            <div style={{ maxHeight:360, overflow:'auto' }}>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
+            <div style={{ maxHeight:360, overflow:'auto', maxWidth:'100%' }}>
+              <table className="ock-table-wide" style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
                 <thead>
                   <tr style={{ background:'var(--surface-inset)', position:'sticky', top:0, zIndex:1 }}>
                     {(ncsTables[ncsTableIdx]?.columns || []).map((column, index, columns) => (
@@ -586,11 +596,11 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
 
   /* ── Right sidebar ───────────────────────────────────── */
   const sidebar = () => (
-    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+    <div className="ock-calc-sidebar" style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
       {/* Weights */}
-      <div className="ock-card" style={{ padding:'16px 18px' }}>
-        <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:14 }}>Веса подходов</div>
+      <div data-tour-id="calc-weights" className="ock-card" style={{ padding:'16px 18px' }}>
+        <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>Веса подходов <HelpTip title="Веса подходов" text="Сумма включенных подходов держится на 100%. Измените один вес, остальные автоматически перераспределятся." side="left" /></div>
         {[
           { k:'comp',   l:'Сравнительный', col:'#2A6FDB' },
           { k:'income', l:'Доходный',      col:'#25A871' },
@@ -652,8 +662,8 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       </div>
 
       {/* Approaches */}
-      <div className="ock-card" style={{ padding:'14px 18px' }}>
-        <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:12 }}>Подходы</div>
+      <div data-tour-id="calc-approaches" className="ock-card" style={{ padding:'14px 18px' }}>
+        <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>Подходы <HelpTip title="Подходы" text="Карточки показывают текущую стоимость по каждому включенному подходу и помогают быстро увидеть, какой метод сильнее влияет на итог." side="left" /></div>
         {[
           { k:'comp',   l:'Сравнительный', v:vComp, note:'Скорр. цены аналогов' },
           { k:'income', l:'Доходный',      v:vInc,  note:'NOI / ставка капитализации' },
@@ -670,8 +680,8 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       </div>
 
       {/* Export */}
-      <div className="ock-card" style={{ padding:'14px 18px' }}>
-        <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:10 }}>Экспорт</div>
+      <div data-tour-id="calc-export" className="ock-card" style={{ padding:'14px 18px' }}>
+        <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:10, display:'flex', alignItems:'center', gap:8 }}>Экспорт <HelpTip title="Экспорт расчёта" text="DOC ведет к формированию отчета. JSON выгружает текущие параметры расчета для проверки или переноса." side="left" /></div>
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           <Button variant="secondary" block iconLeft={<Icon n="file-text" size={15} />} onClick={() => onNavigate('reports')}>Скачать DOC</Button>
           <Button variant="ghost"     block iconLeft={<Icon n="braces"    size={15} />} onClick={exportCalculation}>Экспорт JSON</Button>
@@ -679,7 +689,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       </div>
 
       {/* Final */}
-      <div style={{ background:'var(--emerald-700)', borderRadius:'var(--radius-lg)', padding:'16px 18px', color:'#fff' }}>
+      <div data-tour-id="calc-final" style={{ background:'var(--emerald-700)', borderRadius:'var(--radius-lg)', padding:'16px 18px', color:'#fff' }}>
         <div style={{ fontSize:'var(--text-xs)', fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em', color:'#A7E8C8' }}>Итоговая стоимость</div>
         <div style={{ fontSize:26, fontWeight:800, fontVariantNumeric:'tabular-nums', marginTop:6, lineHeight:1.1 }}>{fmt(final)} ₽</div>
         <div style={{ fontSize:'var(--text-xs)', color:'#A7E8C8', marginTop:6 }}>
@@ -703,7 +713,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       <PageHead title="Расчет стоимости" subtitle={`Заявка ${requestId} · ${requestTitle}`} />
 
       {/* Sub-tabs */}
-      <div style={{ display:'flex', gap:2, background:'var(--surface-inset)', padding:4, borderRadius:'var(--radius-lg)', marginBottom:20, width:'fit-content' }}>
+      <div data-tour-id="calc-tabs" style={{ display:'flex', gap:2, background:'var(--surface-inset)', padding:4, borderRadius:'var(--radius-lg)', marginBottom:20, width:'fit-content' }}>
         {TABS.map(t => (
           <button key={t.k} onClick={()=>setTab(t.k)} style={{
             display:'inline-flex', alignItems:'center', gap:7,
@@ -721,8 +731,8 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       </div>
 
       {/* 2-col layout */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 300px', gap:20, alignItems:'start' }}>
-        <div>
+      <div className="ock-calc-layout">
+        <div style={{ minWidth:0 }}>
           {tab==='comp'   && tabComp()}
           {tab==='income' && tabIncome()}
           {tab==='cost'   && tabCost()}

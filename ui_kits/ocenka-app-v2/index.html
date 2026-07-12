@@ -14,7 +14,25 @@
   #app { height: 100vh; display: flex; }
   .ock-main    { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .ock-content { flex: 1; overflow-y: auto; padding: 28px 32px 48px; }
-  .ock-content-inner { max-width: 1320px; margin: 0 auto; }
+  .ock-content-inner { width: 100%; max-width: 1320px; margin: 0 auto; box-sizing: border-box; }
+  .ock-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; }
+  .ock-table-wide { min-width: 900px; }
+  .ock-table-scroll > table { min-width: 900px; }
+  .ock-calc-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 300px); gap: 20px; align-items: start; }
+  .ock-kpi-grid { min-width: 0; }
+  .ock-form-grid { min-width: 0; }
+  @media (max-width: 1420px) {
+    .ock-calc-layout { grid-template-columns: minmax(0, 1fr); }
+    .ock-calc-sidebar { position: static !important; }
+  }
+  @media (max-width: 900px) {
+    .ock-content { padding: 20px 16px 36px; }
+    .ock-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .ock-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  }
+  @media (max-width: 640px) {
+    .ock-kpi-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  }
   @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
 </style>
 </head>
@@ -40,6 +58,7 @@
   <script type="text/babel" src="ReportScreenV2.jsx"></script>
   <script type="text/babel" src="MiscScreensV2.jsx"></script>
   <script type="text/babel" src="AnalyticsScreen.jsx"></script>
+  <script type="text/babel" src="OnboardingV2.jsx"></script>
 
   <script type="text/babel" data-presets="react">
     function showBootError(error) {
@@ -147,6 +166,7 @@
             }} />
             <div className="ock-content ds-scroll" ref={contentRef}>
               <div className="ock-content-inner">
+                <ContextHelpV2 active={active} />
                 {screens[active] || screens.dashboard}
               </div>
             </div>
@@ -164,6 +184,7 @@
               {toastMsg}
             </div>
           ) : null}
+          <OnboardingV2 active={active} onNavigate={navigate} toast={toast} />
         </React.Fragment>
       );
     }

@@ -2,7 +2,7 @@
 window.SidebarV2 = function SidebarV2({ active, onNavigate }) {
   const D = window.OcenkaData;
   return (
-    <aside style={{
+    <aside data-tour-id="sidebar" style={{
       width: 'var(--sidebar-width)', flexShrink: 0, height: '100%',
       background: 'var(--surface-sidebar)', display: 'flex', flexDirection: 'column',
     }}>
@@ -21,7 +21,7 @@ window.SidebarV2 = function SidebarV2({ active, onNavigate }) {
           const on = item.key === active;
           const isAnalytics = item.key === 'analytics';
           return (
-            <button key={item.key} onClick={() => onNavigate(item.key)}
+            <button key={item.key} data-tour-id={`nav-${item.key}`} onClick={() => onNavigate(item.key)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 11, width: '100%',
                 padding: '9px 12px', border: 'none', borderRadius: 'var(--radius-md)',

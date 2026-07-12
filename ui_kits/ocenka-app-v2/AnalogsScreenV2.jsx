@@ -107,6 +107,35 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
       {children}
     </th>
   );
+  const includeToggle = (id, active) => (
+    <button
+      type="button"
+      aria-label={active ? 'Учитывать аналог в расчетах' : 'Не учитывать аналог в расчетах'}
+      onClick={(event) => {
+        event.stopPropagation();
+        toggleStatus(id);
+      }}
+      style={{
+        minWidth:78,
+        height:28,
+        border:'1px solid var(--border-subtle)',
+        borderRadius:999,
+        background:active ? 'var(--emerald-50)' : 'var(--surface-inset)',
+        color:active ? 'var(--success-text)' : 'var(--text-muted)',
+        fontFamily:'var(--font-mono)',
+        fontSize:'var(--text-xs)',
+        fontWeight:800,
+        cursor:'pointer',
+        display:'inline-flex',
+        alignItems:'center',
+        justifyContent:'center',
+        gap:6,
+      }}
+    >
+      <Icon n={active ? 'check' : 'x'} size={13} />
+      {active ? 'true' : 'false'}
+    </button>
+  );
   const activeAnalogs = analogRows.filter((analog) => statuses[analog.id] !== false);
   const avgPerM2 = activeAnalogs.length
     ? Math.round(activeAnalogs.reduce((sum, analog) => sum + toNum(analog.perM2), 0) / activeAnalogs.length)
@@ -145,6 +174,39 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
     } catch {}
     onNavigate('calc');
   };
+  const modalBackdrop = {
+    position:'fixed',
+    top:0,
+    right:0,
+    bottom:0,
+    left:'var(--sidebar-width)',
+    zIndex:210,
+    background:'rgba(15, 23, 42, .42)',
+    display:'grid',
+    placeItems:'center',
+    padding:24,
+    boxSizing:'border-box',
+  };
+  const modalPanel = {
+    width:'min(100%, 620px)',
+    maxHeight:'calc(100vh - 48px)',
+    background:'var(--surface-card)',
+    border:'1px solid var(--border-subtle)',
+    borderRadius:'var(--radius-lg)',
+    boxShadow:'var(--shadow-lg)',
+    overflow:'hidden',
+    display:'flex',
+    flexDirection:'column',
+  };
+  const modalBody = {
+    padding:20,
+    display:'grid',
+    gap:14,
+    overflowY:'auto',
+    minHeight:0,
+  };
+  const manualGrid2 = { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(180px, 1fr))', gap:12, minWidth:0 };
+  const manualGrid3 = { display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:12, minWidth:0 };
 
   return (
     <div>
@@ -155,7 +217,7 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
         ]} />
 
       {/* KPI strip */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:20 }}>
+      <div className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:16, marginBottom:20 }}>
         {[
           { l:'Найдено аналогов',        v:String(analogRows.length),          i:'git-compare',  t:'brand' },
           { l:'Средняя цена за м²',      v:`${avgPerM2.toLocaleString('ru-RU')} ₽`,  i:'ruler',        t:'brand' },
@@ -165,11 +227,13 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
       </div>
 
       {/* Table */}
+      <div data-tour-id="analogs-table">
       <Card noBodyPad title="Объекты-аналоги" actions={<Badge tone="info">ЦИАН · Авито · Domclick</Badge>}>
-        <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+        <div className="ock-table-scroll">
+          <table className="ock-table-wide" style={{ width:'100%', borderCollapse:'collapse', minWidth:1000 }}>
             <thead>
               <tr>
+                <TH>Учитывать</TH>
                 <TH>Адрес / источник</TH>
                 <TH right>Цена</TH><TH right>М²</TH><TH right>₽/м²</TH>
                 <TH>Расст.</TH><TH>Состояние</TH>
@@ -184,10 +248,13 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
                   <tr key={a.id} onClick={() => setSelectedId(a.id)} style={{ cursor:'pointer', transition:'background .1s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-inset)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)', whiteSpace:'nowrap' }}>
+                      {includeToggle(a.id, active)}
+                    </td>
                     <td style={{ padding:'13px 14px', borderBottom:'1px solid var(--divider)' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                         <span style={{ fontWeight:600, color:'var(--text-strong)', fontSize:'var(--text-sm)' }}>{a.addr}</span>
-                        {!active && <Badge tone="danger" pill>Снято</Badge>}
+                        {!active && <Badge tone="danger" pill>не учитывается</Badge>}
                       </div>
                       <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2 }}>{a.source}</div>
                     </td>
@@ -209,10 +276,11 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
           <span style={{ fontSize:'var(--text-sm)', color:'var(--text-muted)' }}>Средняя скорр. стоимость</span>
           <div style={{ display:'flex', alignItems:'center', gap:16 }}>
             <span style={{ fontSize:'var(--text-xl)', fontWeight:700, color:'var(--text-value)', fontVariantNumeric:'tabular-nums' }}>{avgAdjusted.toLocaleString('ru-RU')} ₽</span>
-            <Button variant="primary" iconRight={<Icon n="arrow-right" size={15} />} onClick={sendToCalculation}>В расчет</Button>
+            <span data-tour-id="analogs-to-calc"><Button variant="primary" iconRight={<Icon n="arrow-right" size={15} />} onClick={sendToCalculation}>В расчет</Button></span>
           </div>
         </div>
       </Card>
+      </div>
 
       {/* ─── Detail modal ─────────────────────────────────────────────────── */}
       {selected ? (
@@ -333,7 +401,7 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
                 fontFamily:'var(--font-sans)', fontSize:'var(--text-sm)', fontWeight:600, cursor:'pointer',
               }}>
                 <Icon n={statuses[selected.id] ? 'ban' : 'circle-check-big'} size={16} />
-                {statuses[selected.id] ? 'Отметить объявление как снятое' : 'Восстановить активный статус'}
+                {statuses[selected.id] ? 'Не учитывать в расчетах' : 'Учитывать в расчетах'}
               </button>
               <div style={{ display:'flex', gap:10 }}>
                 <Button variant="ghost" onClick={() => setSelectedId(null)}>Закрыть</Button>
@@ -344,28 +412,28 @@ window.AnalogsScreenV2 = function AnalogsScreenV2({ request, onNavigate, toast }
         </div>
       ) : null}
       {manualOpen ? (
-        <div style={{ position:'fixed', inset:0, zIndex:210, background:'rgba(15, 23, 42, .42)', display:'grid', placeItems:'center', padding:24 }} onMouseDown={() => setManualOpen(false)}>
-          <form onSubmit={addManualAnalog} onMouseDown={(event) => event.stopPropagation()} style={{ width:'min(100%, 560px)', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow-lg)', overflow:'hidden' }}>
-            <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-              <div>
+        <div style={modalBackdrop} onMouseDown={() => setManualOpen(false)}>
+          <form onSubmit={addManualAnalog} onMouseDown={(event) => event.stopPropagation()} style={modalPanel}>
+            <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexShrink:0 }}>
+              <div style={{ minWidth:0 }}>
                 <div style={{ fontSize:'var(--text-lg)', fontWeight:800, color:'var(--text-strong)' }}>Новый аналог</div>
                 <div style={{ marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-sm)' }}>Будет добавлен в текущую подборку</div>
               </div>
               <button type="button" onClick={() => setManualOpen(false)} aria-label="Закрыть" style={{ border:'none', background:'transparent', cursor:'pointer', color:'var(--text-muted)', padding:6 }}><Icon n="x" size={18} /></button>
             </div>
-            <div style={{ padding:20, display:'grid', gap:14 }}>
+            <div className="ds-scroll" style={modalBody}>
               <NS.Input label="Адрес" required value={manualDraft.addr} onChange={(event) => setManualDraft((p) => ({ ...p, addr:event.target.value }))} />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div style={manualGrid2}>
                 <NS.Input label="Источник" value={manualDraft.source} onChange={(event) => setManualDraft((p) => ({ ...p, source:event.target.value }))} />
                 <NS.Input label="Расстояние" value={manualDraft.dist} onChange={(event) => setManualDraft((p) => ({ ...p, dist:event.target.value }))} />
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+              <div style={manualGrid3}>
                 <NS.Input label="Цена, ₽" type="number" required value={manualDraft.price} onChange={(event) => setManualDraft((p) => ({ ...p, price:event.target.value }))} />
                 <NS.Input label="Площадь, м²" type="number" required value={manualDraft.area} onChange={(event) => setManualDraft((p) => ({ ...p, area:event.target.value }))} />
                 <NS.Input label="Состояние" value={manualDraft.cond} onChange={(event) => setManualDraft((p) => ({ ...p, cond:event.target.value }))} />
               </div>
             </div>
-            <div style={{ padding:'14px 20px', borderTop:'1px solid var(--divider)', display:'flex', justifyContent:'flex-end', gap:10 }}>
+            <div style={{ padding:'14px 20px', borderTop:'1px solid var(--divider)', display:'flex', justifyContent:'flex-end', gap:10, flexShrink:0 }}>
               <Button type="button" variant="secondary" onClick={() => setManualOpen(false)}>Отмена</Button>
               <Button type="submit" variant="primary" iconLeft={<Icon n="plus" size={16} />}>Добавить</Button>
             </div>
