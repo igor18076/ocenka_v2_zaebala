@@ -2,14 +2,24 @@
 window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigate }) {
   const { KpiCard, Card, Table, StatusBadge, Button, Avatar } = NS;
   const D = window.OcenkaData;
-  const requests = (() => {
+  const loadRequests = () => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem('ocenka.requests.kanban.v1') || 'null');
+      const saved = window.readLocalJson ? window.readLocalJson('ocenka.requests.kanban.v1', null) : null;
       return Array.isArray(saved) ? saved : (D.requests || []);
     } catch {
       return D.requests || [];
     }
-  })();
+  };
+  const [requests, setRequests] = React.useState(loadRequests);
+  React.useEffect(() => {
+    const reload = () => setRequests(loadRequests());
+    window.addEventListener('ocenka:requests-updated', reload);
+    window.addEventListener('storage', reload);
+    return () => {
+      window.removeEventListener('ocenka:requests-updated', reload);
+      window.removeEventListener('storage', reload);
+    };
+  }, []);
   const activeCount = requests.filter((request) => request.status !== 'ready').length;
   const readyCount = requests.filter((request) => request.status === 'ready').length;
   const reviewCount = requests.filter((request) => request.status === 'review').length;
@@ -28,73 +38,73 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
       <div data-tour-id="dashboard-hero" style={{
         position: 'relative', overflow: 'hidden',
         background: 'var(--blue-900)', borderRadius: 'var(--radius-xl)',
-        padding: '28px 32px', marginBottom: 24,
+        padding: '28px 32px', marginBottom: 24, color: '#fff',
       }}>
-        <div style={{ position: 'relative', maxWidth: 640 }}>
-          <div className="ds-overline" style={{ color: '#7FB0E8' }}>Рабочее пространство оценщика</div>
-          <h2 style={{ color: '#fff', fontSize: 'var(--text-3xl)', fontWeight: 800, letterSpacing: 0, marginTop: 10, lineHeight: 1.15 }}>
-            Автоматизируйте оценку недвижимости:<br />от заявки до готового отчета
-          </h2>
-          <p style={{ color: '#C7D6EC', fontSize: 'var(--text-md)', marginTop: 12, lineHeight: 1.55 }}>
-            Система помогает собирать данные, подбирать аналоги, выполнять расчеты и формировать
-            отчет с учетом требований ФСО.
-          </p>
-          <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
-            <Button variant="accent" iconLeft={<Icon n="plus" size={16} />} onClick={() => {
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse at 80% 20%, rgba(93,195,147,.28), transparent 55%)', pointerEvents:'none' }} />
+        <div style={{ position:'relative', display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:24, flexWrap:'wrap' }}>
+          <div>
+            <div style={{ fontSize:'var(--text-xs)', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', opacity:.7, marginBottom:8 }}>Рабочий стол</div>
+            <h1 style={{ margin:0, fontSize:'var(--text-3xl)', fontWeight:800, letterSpacing:'-0.02em' }}>Оценка PRO</h1>
+            <p style={{ margin:'8px 0 0', opacity:.85, fontSize:'var(--text-sm)', maxWidth:420, lineHeight:1.45 }}>
+              {requests.length
+                ? `На доске ${requests.length} заявок · ${reviewCount} на проверке · ${readyCount} готовы`
+                : 'Создайте первую заявку и проведите оценку от подбора аналогов до отчёта'}
+            </p>
+          </div>
+          <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+            <Button variant="secondary" onClick={() => onNavigate('requests')} style={{ background:'rgba(255,255,255,.12)', border:'1px solid rgba(255,255,255,.25)', color:'#fff' }}>Доска заявок</Button>
+            <Button variant="primary" iconLeft={<Icon n="plus" size={16} />} onClick={() => {
               onNavigate('requests');
               window.setTimeout(() => window.dispatchEvent(new Event('ocenka:create-request')), 0);
-            }}>Создать заявку</Button>
-            <button onClick={() => onNavigate('fso')} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.1)', color: '#fff', border: '1px solid rgba(255,255,255,.18)', borderRadius: 'var(--radius-md)', padding: '0 18px', height: 38, fontFamily: 'var(--font-sans)', fontSize: 'var(--text-base)', fontWeight: 600, cursor: 'pointer' }}>
-              <Icon n="shield-check" size={16} /> Проверка ФСО
-            </button>
+            }}>Новая заявка</Button>
           </div>
         </div>
       </div>
 
-      <div data-tour-id="getting-started" style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:14, marginBottom:24 }}>
+      <div data-tour-id="getting-started" className="ock-grid ock-grid--three" style={{ gap:12, marginBottom:24 }}>
         {[
           { title:'Создать заявку', text:'Открыть форму новой оценки', icon:'plus', action:() => { onNavigate('requests'); window.setTimeout(() => window.dispatchEvent(new Event('ocenka:create-request')), 0); } },
           { title:'Открыть доску', text:'Посмотреть этапы всех заявок', icon:'columns-3', action:() => onNavigate('requests') },
           { title:'Проверить объект', text:'Уточнить параметры и документы', icon:'home', action:() => { if (requests[0]) onOpenRequest(requests[0]); else onNavigate('objects'); } },
-          { title:'Сформировать отчет', text:'Перейти к выгрузке результата', icon:'file-check', action:() => onNavigate('reports') },
         ].map((item) => (
-          <button key={item.title} onClick={item.action} style={{ textAlign:'left', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:14, cursor:'pointer', display:'flex', gap:12, alignItems:'flex-start', fontFamily:'var(--font-sans)' }}>
-            <span style={{ width:32, height:32, borderRadius:'var(--radius-sm)', background:'var(--blue-50)', color:'var(--blue-700)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}><Icon n={item.icon} size={16} /></span>
-            <span style={{ minWidth:0 }}>
-              <span style={{ display:'block', color:'var(--text-strong)', fontSize:'var(--text-sm)', fontWeight:800 }}>{item.title}</span>
-              <span style={{ display:'block', marginTop:3, color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.4 }}>{item.text}</span>
+          <button key={item.title} type="button" onClick={item.action} style={{
+            textAlign:'left', padding:'16px 18px', borderRadius:'var(--radius-lg)', border:'1px solid var(--border-subtle)',
+            background:'var(--surface-card)', cursor:'pointer', display:'flex', gap:14, alignItems:'flex-start',
+          }}>
+            <span style={{ width:36, height:36, borderRadius:'var(--radius-md)', background:'var(--blue-50)', color:'var(--blue-700)', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <Icon n={item.icon} size={18} />
+            </span>
+            <span>
+              <div style={{ fontWeight:700, color:'var(--text-strong)', fontSize:'var(--text-sm)' }}>{item.title}</div>
+              <div style={{ marginTop:4, color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.4 }}>{item.text}</div>
             </span>
           </button>
         ))}
       </div>
 
       {/* KPIs */}
-      <div data-tour-id="dashboard-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
-        {dashboardKpis.map((k, i) => (
-          <KpiCard key={i} label={k.label} value={k.value} icon={<Icon n={k.icon} size={18} />}
-            iconTone={k.tone} delta={k.delta} deltaDir={k.dir} helper={k.helper} />
+      <div className="ock-grid ock-grid--kpi-5 ock-kpi-grid" style={{ gap:16, marginBottom:24 }}>
+        {dashboardKpis.map((kpi) => (
+          <KpiCard key={kpi.label} label={kpi.label} value={kpi.value} icon={<Icon n={kpi.icon} size={18} />} iconTone={kpi.tone} helper={kpi.helper} />
         ))}
       </div>
 
       {/* Recent requests */}
       <div data-tour-id="dashboard-requests">
-      <Card noBodyPad
-        title="Последние заявки"
+      <Card
+        title="Недавние заявки"
         actions={<Button variant="ghost" size="sm" iconRight={<Icon n="arrow-right" size={15} />} onClick={() => onNavigate('requests')}>Все заявки</Button>}>
-        <Table numeric onRowClick={(r) => onOpenRequest(r)}
+        <Table
           columns={[
-            { key: 'id', header: '№ заявки', render: (r) => <span className="ds-mono" style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{r.id}</span> },
-            { key: 'object', header: 'Объект', render: (r) => (
-              <div><div style={{ fontWeight: 600, color: 'var(--text-strong)' }}>{r.object}</div><div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>{r.address}</div></div>
+            { key:'id', label:'№', render:(row) => <span className="ds-mono" style={{ fontSize:'var(--text-xs)' }}>{row.id}</span> },
+            { key:'object', label:'Объект', render:(row) => (
+              <button type="button" onClick={() => onOpenRequest(row)} style={{ background:'none', border:'none', padding:0, cursor:'pointer', color:'var(--text-link)', fontWeight:600, fontFamily:'inherit', fontSize:'var(--text-sm)', textAlign:'left' }}>{row.object}</button>
             ) },
-            { key: 'client', header: 'Клиент' },
-            { key: 'type', header: 'Тип оценки' },
-            { key: 'status', header: 'Статус', render: (r) => <StatusBadge status={r.status} /> },
-            { key: 'date', header: 'Дата оценки' },
-            { key: 'owner', header: 'Ответственный', render: (r) => r.owner === '—'
-              ? <span style={{ color: 'var(--text-subtle)' }}>—</span>
-              : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Avatar name={r.owner} size="sm" />{r.owner}</span> },
-            { key: 'act', header: '', align: 'right', render: () => <span style={{ color: 'var(--text-subtle)' }}><Icon n="chevron-right" size={16} /></span> },
+            { key:'client', label:'Клиент' },
+            { key:'status', label:'Стадия', render:(row) => <StatusBadge status={row.status} /> },
+            { key:'owner', label:'Ответственный', render:(row) => row.owner && row.owner !== '—'
+              ? <span style={{ display:'inline-flex', alignItems:'center', gap:8 }}><Avatar name={row.owner} size="sm" /><span>{row.owner}</span></span>
+              : <span style={{ color:'var(--text-subtle)' }}>—</span> },
           ]}
           rows={requests.slice(0, 5)} />
       </Card>

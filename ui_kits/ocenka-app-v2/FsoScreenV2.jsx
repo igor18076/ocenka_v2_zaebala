@@ -1,26 +1,33 @@
 /* ФСО compliance checklist with live progress. window.FsoScreen */
 window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
-  const { Card, Button, ProgressBar, Badge } = NS;
+  const { Card, Button, Badge } = NS;
   const requestId = request?.id || window.OcenkaData.object?.id;
   const storageKey = (id) => `ocenka.fso.${id || 'draft'}.v1`;
   const baseItems = () => window.OcenkaData.fso.map((x) => ({ ...x }));
+  const autoItems = (id) => {
+    const signals = window.OcenkaFso ? window.OcenkaFso.evaluateSignals(id) : {};
+    return baseItems().map((item) => (
+      item.label in signals ? { ...item, done: !!signals[item.label] } : { ...item, done: false }
+    ));
+  };
   const loadItems = (id) => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem(storageKey(id)) || 'null');
-      return Array.isArray(saved) ? saved : baseItems();
+      const saved = window.readLocalJson ? window.readLocalJson(storageKey(id), null) : null;
+      return Array.isArray(saved) ? saved : autoItems(id);
     } catch {
-      return baseItems();
+      return autoItems(id);
     }
   };
   const [items, setItems] = React.useState(() => loadItems(requestId));
   const [loadedRequestId, setLoadedRequestId] = React.useState(requestId);
 
+  const total = items.length || 1;
   const done = items.filter((i) => i.done).length;
-  const pct = Math.round((done / items.length) * 100);
+  const pct = Math.round((done / total) * 100);
   const toggle = (idx) => setItems((arr) => arr.map((it, i) => i === idx ? { ...it, done: !it.done } : it));
   const recheck = () => {
-    setItems(baseItems());
-    if (toast) toast('Проверка ФСО обновлена');
+    setItems(autoItems(requestId));
+    if (toast) toast('Проверка ФСО обновлена по данным заявки');
   };
   React.useEffect(() => {
     setItems(loadItems(requestId));
@@ -29,7 +36,7 @@ window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
   React.useEffect(() => {
     if (loadedRequestId !== requestId) return;
     try {
-      window.localStorage.setItem(storageKey(requestId), JSON.stringify(items));
+      if (window.writeLocalJson) window.writeLocalJson(storageKey(requestId), items);
     } catch {}
   }, [requestId, loadedRequestId, items]);
 
@@ -38,7 +45,7 @@ window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
       <PageHead title="Проверка ФСО" subtitle={`Заявка ${requestId} · соответствие отчета федеральным стандартам оценки`}
         actions={<Button variant="primary" iconLeft={<Icon n="refresh-cw" size={16} />} onClick={recheck}>Перепроверить</Button>} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 20, alignItems: 'start' }}>
+      <div className="ock-grid ock-grid--main-side ock-grid--top">
         {/* Progress summary */}
         <Card>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14, padding: '8px 4px' }}>
@@ -70,7 +77,7 @@ window.FsoScreenV2 = function FsoScreenV2({ request, onNavigate, toast }) {
         <Card title="Чек-лист соответствия" noBodyPad>
           <div>
             {items.map((it, i) => (
-              <button key={i} onClick={() => toggle(i)} style={{
+              <button key={it.label || i} onClick={() => toggle(i)} style={{
                 display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
                 padding: '14px 20px', border: 'none', borderBottom: i < items.length - 1 ? '1px solid var(--divider)' : 'none',
                 background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-sans)',

@@ -13,6 +13,18 @@ const ncsTablesPath = path.join(rootDir, 'backend', 'seed', 'ncs-tables.json');
 
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
+const forceReseed = process.argv.includes('--force');
+if (fs.existsSync(dbPath) && !forceReseed) {
+  console.error(`Refusing to wipe existing database at ${path.relative(rootDir, dbPath)}.`);
+  console.error('Pass --force to destroy and reseed (this deletes all data):');
+  console.error('  npm run db:seed -- --force');
+  process.exit(1);
+}
+if (forceReseed && fs.existsSync(dbPath)) {
+  console.warn(`--force: wiping existing database at ${path.relative(rootDir, dbPath)}`);
+  fs.unlinkSync(dbPath);
+}
+
 const db = new DatabaseSync(dbPath);
 db.exec(fs.readFileSync(schemaPath, 'utf8'));
 const clientColumns = new Set(db.prepare('PRAGMA table_info(clients)').all().map((column) => column.name));
@@ -28,6 +40,12 @@ const ncsTables = JSON.parse(fs.readFileSync(ncsTablesPath, 'utf8'));
 const passwordIterations = 120000;
 const passwordSalt = crypto.randomBytes(16).toString('hex');
 const seedPassword = process.env.OCENKA_SEED_PASSWORD || 'ocenka123';
+if (!process.env.OCENKA_SEED_PASSWORD && process.env.NODE_ENV === 'production') {
+  throw new Error('OCENKA_SEED_PASSWORD is required when NODE_ENV=production');
+}
+if (!process.env.OCENKA_SEED_PASSWORD) {
+  console.warn('Warning: using default seed password. Set OCENKA_SEED_PASSWORD before first production start.');
+}
 const passwordHash = crypto.pbkdf2Sync(seedPassword, passwordSalt, passwordIterations, 32, 'sha256').toString('hex');
 
 function bool(value) {
@@ -255,12 +273,16 @@ const tables = [
   'analytics_properties',
   'calculation_comparable_rows'
 ];
-const counts = tables.map((table) => {
-  const { count } = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get();
-  return `${table}=${count}`;
-});
-
-db.close();
+let counts = [];
+try {
+  counts = tables.map((table) => {
+    if (!/^[a-z_]+$/.test(table)) throw new Error(`Unsafe table name: ${table}`);
+    const { count } = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get();
+    return `${table}=${count}`;
+  });
+} finally {
+  db.close();
+}
 
 console.log(`Seeded domain tables into ${path.relative(rootDir, dbPath)}`);
 console.log(counts.join(', '));

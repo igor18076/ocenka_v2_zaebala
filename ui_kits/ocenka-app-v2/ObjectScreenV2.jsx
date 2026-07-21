@@ -16,12 +16,8 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
   } : { ...baseObject, status: 'calc' };
   const loadObject = (source) => {
     const next = makeObject(source);
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(objectStorageKey(next.id)) || 'null');
-      return saved && saved.id === next.id ? { ...next, ...saved } : next;
-    } catch {
-      return next;
-    }
+    const saved = window.readLocalJson ? window.readLocalJson(objectStorageKey(next.id), null) : null;
+    return saved && saved.id === next.id ? { ...next, ...saved } : next;
   };
   const [o, setObject] = React.useState(() => loadObject(request));
   const [draftObject, setDraftObject] = React.useState(() => loadObject(request));
@@ -29,12 +25,24 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
   const [tab, setTab] = React.useState('params');
   const [docs, setDocs] = React.useState(o.docs || []);
   const fileRef = React.useRef(null);
+  const photoRef = React.useRef(null);
+  const addPhotos = (fileList) => {
+    Array.from(fileList || []).slice(0, 8).forEach((file) => {
+      if (!file.type || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = () => setObject((prev) => {
+        const next = [...(prev.photoUrls || []), String(reader.result)].slice(0, 12);
+        return { ...prev, photoUrls: next, photos: next.length };
+      });
+      reader.readAsDataURL(file);
+    });
+  };
+  const removePhoto = (index) => setObject((prev) => {
+    const next = (prev.photoUrls || []).filter((_, i) => i !== index);
+    return { ...prev, photoUrls: next, photos: next.length };
+  });
   const readSavedCalculation = (id) => {
-    try {
-      return JSON.parse(window.localStorage.getItem(`ocenka.calculation.${id || 'draft'}.v1`) || 'null') || {};
-    } catch {
-      return {};
-    }
+    return window.readLocalJson ? window.readLocalJson(`ocenka.calculation.${id || 'draft'}.v1`, {}) || {} : {};
   };
 
   const fileIcon = (kind) => kind === 'doc' ? 'file-text' : 'file';
@@ -55,15 +63,21 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
     if (toast) toast('Карточка объекта обновлена');
   };
   const downloadDoc = (doc) => {
+    if (doc.dataUrl) {
+      try {
+        const link = document.createElement('a');
+        link.href = doc.dataUrl;
+        link.download = doc.name || 'document';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        if (toast) toast('Документ скачивается');
+        return;
+      } catch {}
+    }
+    // Seed documents (and files too large to store) have no content — export a stub.
     const blob = new Blob([`Документ: ${doc.name}\nЗаявка: ${o.id}\nОбъект: ${o.title}\n`], { type:'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = doc.name.replace(/\.(pdf|docx?)$/i, '') + '.txt';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    window.downloadBlob(blob, doc.name.replace(/\.(pdf|docx?)$/i, '') + '.txt');
     if (toast) toast('Документ скачивается');
   };
 
@@ -76,9 +90,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
   }, [request?.id]);
   React.useEffect(() => {
     if (!o?.id) return;
-    try {
-      window.localStorage.setItem(objectStorageKey(o.id), JSON.stringify({ ...o, docs }));
-    } catch {}
+    if (window.writeLocalJson) window.writeLocalJson(objectStorageKey(o.id), { ...o, docs });
   }, [o, docs]);
   const savedCalculation = readSavedCalculation(o.id);
   const summaryValue = toNum(savedCalculation.final) > 0
@@ -129,7 +141,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
         <Badge tone="outline">{o.purpose}</Badge>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="ock-grid ock-grid--wide-side ock-grid--top">
         <div>
           <Card noBodyPad>
             <div data-tour-id="object-tabs" style={{ padding: '6px 16px 0' }}>
@@ -143,7 +155,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
               {tab === 'params' ? (
                 editMode ? (
                   <div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '18px 20px' }}>
+                    <div className="ock-grid ock-grid--three" style={{ gap:'18px 20px' }}>
                       {editField('Наименование объекта', 'title')}
                       {editField('Тип объекта', 'type')}
                       {editField('Площадь', 'area')}
@@ -154,7 +166,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
                       {editField('Цель оценки', 'purpose')}
                       {editField('Вид стоимости', 'valueType')}
                     </div>
-                    <div style={{ marginTop:18, display:'grid', gridTemplateColumns:'2fr 1fr', gap:20 }}>
+                    <div className="ock-grid ock-grid--main-side" style={{ marginTop:18 }}>
                       {editField('Адрес', 'address')}
                       {editField('Заказчик', 'client')}
                     </div>
@@ -164,7 +176,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '22px 24px' }}>
+                  <div className="ock-grid ock-grid--three" style={{ gap:'22px 24px' }}>
                     <DetailField label="Тип объекта" value={o.type} />
                     <DetailField label="Площадь" value={o.area} />
                     <DetailField label="Этажность" value={o.floors} />
@@ -180,6 +192,9 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
 
               {tab === 'docs' ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ padding:'10px 12px', borderRadius:'var(--radius-md)', background:'var(--surface-inset)', color:'var(--text-muted)', fontSize:'var(--text-xs)', lineHeight:1.45 }}>
+                    Seed-документы скачиваются как текстовая заглушка. Загруженные файлы (до 3 МБ) сохраняются в браузере и скачиваются в исходном виде.
+                  </div>
                   {docs.map((d, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--surface-card)' }}>
                       <span style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: d.kind === 'pdf' ? 'var(--red-50)' : 'var(--blue-50)', color: d.kind === 'pdf' ? 'var(--red-600)' : 'var(--blue-600)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -187,7 +202,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
                       </span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, color: 'var(--text-strong)', fontSize: 'var(--text-sm)' }}>{d.name}</div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{d.size}</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{d.size}{d.dataUrl ? ' · файл сохранён' : ' · заглушка'}</div>
                       </div>
                       <button type="button" onClick={() => downloadDoc(d)} aria-label="Скачать документ" style={{ border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer', padding:6, display:'inline-flex' }}><Icon n="download" size={17} /></button>
                       <button type="button" onClick={() => setDocs((items) => items.filter((_, index) => index !== i))} aria-label="Удалить документ" style={{ border:'none', background:'transparent', color:'var(--danger-text)', cursor:'pointer', padding:6, display:'inline-flex' }}><Icon n="trash-2" size={16} /></button>
@@ -200,13 +215,26 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       if (!file) return;
-                      setDocs((items) => [...items, {
+                      const meta = {
                         name: file.name,
                         size: `${Math.max(1, Math.round(file.size / 1024))} КБ`,
                         kind: file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'doc',
-                      }]);
+                      };
+                      const addDoc = (dataUrl) => {
+                        setDocs((items) => [...items, dataUrl ? { ...meta, dataUrl } : meta]);
+                        if (toast) toast(dataUrl ? 'Документ добавлен' : 'Документ добавлен (без содержимого: файл больше 3 МБ)');
+                      };
+                      // Persist the file content (as a data URL) so it stays downloadable
+                      // after navigating away; cap the size to keep localStorage healthy.
+                      if (file.size <= 3 * 1024 * 1024) {
+                        const reader = new FileReader();
+                        reader.onload = () => addDoc(String(reader.result));
+                        reader.onerror = () => addDoc(null);
+                        reader.readAsDataURL(file);
+                      } else {
+                        addDoc(null);
+                      }
                       event.target.value = '';
-                      if (toast) toast('Документ добавлен');
                     }}
                   />
                   <button onClick={() => fileRef.current && fileRef.current.click()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px', border: '1.5px dashed var(--border-default)', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
@@ -216,12 +244,29 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
               ) : null}
 
               {tab === 'photos' ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                  {Array.from({ length: o.photos }).map((_, i) => (
-                    <div key={i} style={{ aspectRatio: '4 / 3', borderRadius: 'var(--radius-md)', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-subtle)', border: '1px solid var(--border-subtle)' }}>
-                      <Icon n="image" size={22} />
-                    </div>
-                  ))}
+                <div>
+                  <div className="ock-grid ock-grid--three" style={{ gap:12 }}>
+                    {(o.photoUrls && o.photoUrls.length)
+                      ? o.photoUrls.map((src, i) => (
+                          <div key={i} style={{ position:'relative' }}>
+                            <a href={src} target="_blank" rel="noopener noreferrer">
+                              <img src={src} alt={`Фото ${i + 1}`} style={{ width:'100%', aspectRatio:'4 / 3', objectFit:'cover', borderRadius:'var(--radius-md)', border:'1px solid var(--border-subtle)', display:'block' }} />
+                            </a>
+                            <button type="button" aria-label="Удалить фото" onClick={() => removePhoto(i)} style={{ position:'absolute', top:6, right:6, width:24, height:24, borderRadius:'50%', border:'none', background:'rgba(0,0,0,.55)', color:'#fff', cursor:'pointer', display:'inline-flex', alignItems:'center', justifyContent:'center' }}>
+                              <Icon n="x" size={13} />
+                            </button>
+                          </div>
+                        ))
+                      : Array.from({ length: o.photos || 0 }).map((_, i) => (
+                          <div key={i} style={{ aspectRatio: '4 / 3', borderRadius: 'var(--radius-md)', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-subtle)', border: '1px solid var(--border-subtle)' }}>
+                            <Icon n="image" size={22} />
+                          </div>
+                        ))}
+                  </div>
+                  <input ref={photoRef} type="file" accept="image/*" multiple style={{ display:'none' }} onChange={(event) => { addPhotos(event.target.files); event.target.value = ''; }} />
+                  <button type="button" onClick={() => photoRef.current && photoRef.current.click()} style={{ marginTop:12, display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'12px', width:'100%', border:'1.5px dashed var(--border-default)', borderRadius:'var(--radius-md)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontFamily:'var(--font-sans)', fontSize:'var(--text-sm)', fontWeight:600 }}>
+                    <Icon n="upload" size={16} /> Загрузить фотографии
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -244,7 +289,7 @@ window.ObjectScreenV2 = function ObjectScreenV2({ request, onBack, onNavigate, t
                 <div style={{ fontSize: 'var(--text-3xl)', fontWeight: 700, color: 'var(--text-value)', fontVariantNumeric: 'tabular-nums', marginTop: 6, letterSpacing: 0 }}>{summaryValue} ₽</div>
                 <div style={{ marginTop:4, fontSize:'var(--text-xs)', color:'var(--text-muted)' }}>{savedCalculation.final ? 'из сохраненного расчета' : `диапазон ${D.result.low}–${D.result.high} ₽`}</div>
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <div className="ock-grid ock-grid--two" style={{ gap:10 }}>
                 {summaryMetric('Тип', o.type, 'home')}
                 {summaryMetric('Площадь', o.area, 'ruler')}
                 {summaryMetric('Документы', String(docs.length), 'files')}

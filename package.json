@@ -5,14 +5,18 @@
   "type": "commonjs",
   "scripts": {
     "db:seed": "node --no-warnings backend/scripts/seed.js",
+    "db:import": "node --no-warnings backend/scripts/import-inpars.js",
+    "db:backup": "node --no-warnings backend/scripts/backup-db.js",
+    "deploy": "node --no-warnings backend/scripts/deploy.js",
+    "build": "node --no-warnings backend/scripts/build.js",
     "start": "node --no-warnings backend/server.js",
-    "check": "node --check backend/server.js && node --check backend/scripts/seed.js && node --check backend/scripts/smoke.js",
+    "start:prod": "npm run build && node --no-warnings backend/scripts/start-prod.js",
+    "check": "node --check backend/server.js && node --check backend/scripts/seed.js && node --check backend/scripts/import-inpars.js && node --check backend/scripts/backup-db.js && node --check backend/scripts/deploy.js && node --check backend/scripts/build.js && node --check backend/scripts/start-prod.js && node --check backend/scripts/smoke.js && node --check backend/scripts/valuation.test.js",
+    "test": "node --no-warnings backend/scripts/valuation.test.js",
     "smoke": "node --no-warnings backend/scripts/smoke.js"
   },
   "engines": {
     "node": ">=22.5.0"
   },
-  "dependencies": {
-    "pdfjs-dist": "^6.1.200"
-  }
+  "dependencies": {}
 }

@@ -7,26 +7,16 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const requestTitle = request?.object || D.object?.title || 'Объект оценки';
   const calcStorageKey = (id) => `ocenka.calculation.${id || 'draft'}.v1`;
   const loadSavedCalculation = (id) => {
-    try {
-      return JSON.parse(window.localStorage.getItem(calcStorageKey(id)) || 'null') || {};
-    } catch {
-      return {};
-    }
+    return window.readLocalJson ? window.readLocalJson(calcStorageKey(id), {}) || {} : {};
   };
   const loadSavedObject = (id) => {
-    try {
-      return JSON.parse(window.localStorage.getItem(`ocenka.object.${id || 'draft'}.v1`) || 'null') || {};
-    } catch {
-      return {};
-    }
+    return window.readLocalJson ? window.readLocalJson(`ocenka.object.${id || 'draft'}.v1`, {}) || {} : {};
   };
   const savedCalc = loadSavedCalculation(requestId);
   const savedObject = loadSavedObject(requestId);
   const [loadedCalcId, setLoadedCalcId] = React.useState(requestId);
-  const toNum = (value, fallback = 0) => {
-    const parsed = Number(String(value ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
+  const V = window.OcenkaValuation;
+  const toNum = window.toNum;
 
   const [tab, setTab]       = React.useState('comp');
   const [weights, setWt]    = React.useState(savedCalc.weights || calc.weights || { comp:60, income:10, cost:30 });
@@ -108,13 +98,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   const [rentRows, setRentRows] = React.useState(buildRentRows(savedCalc));
   const updRentRow = (id, f, v) => setRentRows(rs => rs.map(r => r.id === id ? { ...r, [f]: v } : r));
   const rentSources = calc.income?.sources || [];
-  const rentAnalogRate = () => {
-    const totalWeight = rentRows.reduce((sum, row) => sum + toNum(row.weight), 0) || 1;
-    return Math.round(rentRows.reduce((sum, row) => {
-      const adjusted = toNum(row.rentPerM2) * (1 + (toNum(row.adjLoc) + toNum(row.adjCond)) / 100);
-      return sum + adjusted * (toNum(row.weight) / totalWeight);
-    }, 0));
-  };
+  const rentAnalogRate = () => V.rentAnalogRate(rentRows);
 
   /* ── Затратный ──────────────────────────────────────── */
   const defaultCost = { n:95000, m:subjectArea, kPer:1, kReg:1, kZon:1, kSeis:1, kF:1, zd:0, kInd:1, vat:20, rateCode:'01-02-001-01' };
@@ -180,32 +164,15 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
   /* ── Расчёты ─────────────────────────────────────────── */
   const fmt = n => Math.round(n).toLocaleString('ru');
 
-  function compVal() {
-    const validRows = rows.filter((r) => toNum(r.price) > 0 && toNum(r.area) > 0);
-    const ws = validRows.reduce((s,r) => s + Math.max(0, toNum(r.w)), 0) || 1;
-    return Math.round(validRows.reduce((s,r) => {
-      const adj = 1 + (toNum(r.adjTorg) + toNum(r.adjLoc) + toNum(r.adjRep) + toNum(r.adjFlr)) / 100;
-      return s + (toNum(r.price) / toNum(r.area, 1)) * adj * (Math.max(0, toNum(r.w)) / ws);
-    }, 0) * subjectArea);
-  }
-  function incVal() {
-    const cap = toNum(inc.cap);
-    if (cap <= 0) return 0;
-    const pgi = toNum(inc.area) * toNum(inc.rent) * 12;
-    const noi = pgi * (1 - toNum(inc.vacancy)/100) * (1 - toNum(inc.opex)/100);
-    return Math.max(0, Math.round(noi / (cap/100)));
-  }
-  function cstVal() {
-    const base = toNum(cst.n) * toNum(cst.m) * toNum(cst.kPer, 1) * toNum(cst.kReg, 1) * toNum(cst.kZon, 1) * toNum(cst.kSeis, 1) * toNum(cst.kF, 1);
-    return Math.max(0, Math.round((base + toNum(cst.zd)) * toNum(cst.kInd, 1) * (1 + toNum(cst.vat) / 100)));
-  }
-  const vComp = compVal(), vInc = incVal(), vCst = cstVal();
+  const vComp = V.comparative(rows, subjectArea);
+  const vInc = V.income(inc).value;
+  const vCst = V.cost(cst);
   const wSum = roundWeight((applied.comp ? weights.comp : 0) + (applied.income ? weights.income : 0) + (applied.cost ? weights.cost : 0));
-  const final = wSum ? Math.round(((applied.comp ? vComp*weights.comp : 0) + (applied.income ? vInc*weights.income : 0) + (applied.cost ? vCst*weights.cost : 0)) / wSum) : 0;
+  const final = V.reconcile({ comp: vComp, income: vInc, cost: vCst }, weights, applied);
   React.useEffect(() => {
     if (loadedCalcId !== requestId) return;
     try {
-      window.localStorage.setItem(calcStorageKey(requestId), JSON.stringify({ weights, applied, rows, inc, rentRows, cst: cleanCostParams(cst), ncsTableIdx, final }));
+      if (window.writeLocalJson) window.writeLocalJson(calcStorageKey(requestId), { weights, applied, rows, inc, rentRows, cst: cleanCostParams(cst), ncsTableIdx, final });
     } catch {}
   }, [requestId, loadedCalcId, weights, applied, rows, inc, rentRows, cst, ncsTableIdx, final]);
   React.useEffect(() => {
@@ -228,14 +195,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
       final,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ocenka-calculation-${requestId || 'draft'}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    window.downloadBlob(blob, `ocenka-calculation-${requestId || 'draft'}.json`);
     if (toast) toast('JSON расчета выгружен');
   };
 
@@ -252,7 +212,13 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     const m2s = rows
       .filter(r => toNum(r.price) > 0 && toNum(r.area) > 0)
       .map(r => (toNum(r.price)/toNum(r.area, 1)) * (1+(toNum(r.adjTorg)+toNum(r.adjLoc)+toNum(r.adjRep)+toNum(r.adjFlr))/100));
-    const medM2 = m2s.length ? Math.round(m2s.reduce((a,b)=>a+b,0)/m2s.length) : 0;
+    const avgM2 = m2s.length ? Math.round(m2s.reduce((a,b)=>a+b,0)/m2s.length) : 0;
+    const sortedM2 = [...m2s].sort((a, b) => a - b);
+    const medM2 = sortedM2.length
+      ? Math.round(sortedM2.length % 2
+          ? sortedM2[(sortedM2.length - 1) / 2]
+          : (sortedM2[sortedM2.length / 2 - 1] + sortedM2[sortedM2.length / 2]) / 2)
+      : 0;
     const openAnalog = (row, index) => {
       const analogId = String(row.id || '').startsWith('AN-') ? row.id : D.analogsDetailed?.[index]?.id;
       if (analogId) {
@@ -263,12 +229,12 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     return (
       <div>
         {/* KPI row */}
-        <div data-tour-id="calc-summary" className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:14, marginBottom:20 }}>
+        <div data-tour-id="calc-summary" className="ock-grid ock-grid--kpi-4" style={{ gap:14, marginBottom:20 }}>
           {[
             { l:'Итоговая стоимость',    v:`${fmt(final)} ₽`,                    strong:true },
             { l:'Сравнительный подход',  v:`${fmt(vComp)} ₽` },
             { l:'Согл. цена за 1 м²',   v:`${fmt(subjectArea ? Math.round(final/subjectArea) : 0)} ₽/м²` },
-            { l:'Дата расчёта',         v:D.result.date },
+            { l:'Дата расчёта',         v:(savedObject?.date || D.object?.date || D.result?.date || '—') },
           ].map((c,i) => (
             <div key={i} style={{ padding:'14px 16px', background:'var(--surface-card)', border:`1.5px solid ${i===0?'var(--blue-600)':'var(--border-subtle)'}`, borderRadius:'var(--radius-lg)' }}>
               <div style={{ fontSize:'var(--text-xs)', fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.04em' }}>{c.l}</div>
@@ -330,10 +296,10 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             <div style={{ fontWeight:600, color:'var(--text-strong)', display:'flex', alignItems:'center', gap:8 }}>Рыночная вилка <HelpTip title="Рыночная вилка" text="Быстрая проверка диапазона цен за квадратный метр по активным аналогам. Если итог сильно выбивается, стоит проверить поправки и веса." /></div>
             <Badge tone="info">{rows.length} объектов</Badge>
           </div>
-          <div className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(4,minmax(0,1fr))', gap:12 }}>
+          <div className="ock-grid ock-grid--kpi-4" style={{ gap:12 }}>
             {[
               { l:'Медиана 1 м²',   v:fmt(medM2) },
-              { l:'Средняя 1 м²',   v:fmt(medM2) },
+              { l:'Средняя 1 м²',   v:fmt(avgM2) },
               { l:'Минимум 1 м²',   v:fmt(m2s.length ? Math.round(Math.min(...m2s)) : 0) },
               { l:'Максимум 1 м²',  v:fmt(m2s.length ? Math.round(Math.max(...m2s)) : 0) },
             ].map((s,i) => (
@@ -392,7 +358,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
     ];
     return (
       <div>
-        <div data-tour-id="calc-income-kpis" className="ock-kpi-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:14, marginBottom:20 }}>
+        <div data-tour-id="calc-income-kpis" className="ock-grid ock-grid--kpi-3" style={{ gap:14, marginBottom:20 }}>
           {[
             { l:'Потенц. ВД (PGI)',   v:fmt(pgi)+' ₽/год' },
             { l:'Действит. ВД (EGI)', v:fmt(egi)+' ₽/год' },
@@ -406,7 +372,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
         </div>
         <div data-tour-id="calc-income-params" style={{ background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', padding:20, marginBottom:16 }}>
           <div style={{ fontWeight:600, color:'var(--text-strong)', marginBottom:16, display:'flex', alignItems:'center', gap:8 }}>Параметры доходного подхода <HelpTip title="Доходный подход" text="Расчёт идёт от потенциального дохода к NOI, затем NOI делится на ставку капитализации. Ставка аренды может быть введена вручную или взята из таблицы аналогов." side="bottom" /></div>
-          <div className="ock-form-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:16 }}>
+          <div className="ock-grid ock-grid--three" style={{ gap:16 }}>
             {fields.map(f => (
               <div key={f.k}>
                 <label style={{ fontSize:'var(--text-xs)', fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:6 }}>{f.l}</label>
@@ -500,7 +466,7 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
             </div>
             <Badge tone="info">{cst.rateCode}</Badge>
           </div>
-          <div className="ock-form-grid" style={{ display:'grid', gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:16 }}>
+          <div className="ock-grid ock-grid--three" style={{ gap:16 }}>
             {fields.map(f => (
               <div key={f.k}>
                 <label style={{ fontSize:'var(--text-xs)', fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:6 }}>{f.l}</label>

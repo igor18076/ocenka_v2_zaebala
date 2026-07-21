@@ -101,6 +101,8 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
 
   const [filt, setFilt] = React.useState({ useType:'all', cls:'all', era:'all', line:'all', propType:'all' });
   const set = (k,v) => setFilt(f=>({...f,[k]:v}));
+  const propTypeOptions = [{ k:'propType', v:'all', l:'Все' }]
+    .concat(Array.from(new Set(all.map((p) => p.type).filter(Boolean))).sort().map((t) => ({ k:'propType', v:t, l:t })));
   const resetFilters = () => {
     setFilt({ useType:'all', cls:'all', era:'all', line:'all', propType:'all' });
     if (toast) toast('Фильтры аналитики сброшены');
@@ -178,14 +180,7 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
       ].map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(';')),
     ];
     const blob = new Blob(['\ufeff' + lines.join('\n')], { type:'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'market-analytics.csv';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    window.downloadBlob(blob, 'market-analytics.csv');
     if (toast) toast('Выгрузка аналитики сформирована');
   };
 
@@ -220,10 +215,11 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
         <FilterPill label="Класс"  value={filt.cls}      options={[{k:'cls',v:'all',l:'Все'},{k:'cls',v:'Эконом',l:'Эконом'},{k:'cls',v:'Комфорт',l:'Комфорт'},{k:'cls',v:'Бизнес',l:'Бизнес'}]} />
         <FilterPill label="Эпоха"  value={filt.era}      options={[{k:'era',v:'all',l:'Все'},{k:'era',v:'Хрущевка',l:'Хрущевка'},{k:'era',v:'Советская',l:'Советская'},{k:'era',v:'Сталинка',l:'Сталинка'},{k:'era',v:'Новостройка',l:'Новостройка'}]} />
         <FilterPill label="Линия"  value={filt.line}     options={[{k:'line',v:'all',l:'Все'},{k:'line',v:'1-я линия',l:'1-я'},{k:'line',v:'2-я линия',l:'2-я'}]} />
+        {propTypeOptions.length > 2 ? <FilterPill label="Назначение" value={filt.propType} options={propTypeOptions} /> : null}
       </div>
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16, marginBottom:20 }}>
+      <div className="ock-grid ock-grid--kpi-4" style={{ gap:16, marginBottom:20 }}>
         {[
           { l:'Средняя цена за м²',  v:`${fmt1000(avgM2)} тыс. ₽`,                    i:'trending-up',     t:'brand'  },
           { l:'Медиана цены за м²',  v:`${fmt1000(medM2)} тыс. ₽`,                    i:'activity',        t:'brand'  },
@@ -234,13 +230,13 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
 
       {/* Charts row 1 */}
       <div data-tour-id="analytics-charts">
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+      <div className="ock-grid ock-grid--two ock-grid--section">
         <ChartBox title="Средняя цена за м² по районам, тыс. ₽"    chartType="bar" labels={distC.labels}  values={distC.values}  horizontal />
         <ChartBox title="Средняя цена за м² по классу объекта, тыс. ₽" chartType="bar" labels={classC.labels} values={classC.values} />
       </div>
 
       {/* Dynamics */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+      <div className="ock-grid ock-grid--two ock-grid--section">
         <ChartBox
           title="Динамика цены за м² по годам, тыс. ₽"
           chartType="line"
@@ -276,19 +272,19 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
       </div>
 
       {/* Charts row 2 */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+      <div className="ock-grid ock-grid--two ock-grid--section">
         <ChartBox title="Цена за м² по эпохе застройки, тыс. ₽"       chartType="bar"      labels={eraC.labels}  values={eraC.values} />
         <ChartBox title="Цена за м² по материалу несущих стен, тыс. ₽" chartType="bar"      labels={wallC.labels} values={wallC.values} />
       </div>
 
       {/* Charts row 3 */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+      <div className="ock-grid ock-grid--two ock-grid--section">
         <ChartBox title="Цена за м² по состоянию объекта, тыс. ₽"  chartType="bar"      labels={condC.labels} values={condC.values} />
         <ChartBox title="Цена за м² по этажности здания, тыс. ₽"   chartType="bar"      labels={flrLabels}    values={flrData} />
       </div>
 
       {/* Row 4 — doughnut */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:20, marginBottom:20 }}>
+      <div className="ock-grid ock-grid--analytics-wide ock-grid--section">
         <ChartBox title="Распределение по типам объектов" chartType="doughnut" labels={typeC.labels} values={typeC.values} height={260} />
         {/* Price range table */}
         <div className="ock-card" style={{ padding:0, overflow:'hidden' }}>
@@ -296,7 +292,7 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
             <span>Диапазон цен по районам</span>
             <NS.Badge tone="info">{Object.keys(byDistrict).length} районов</NS.Badge>
           </div>
-          <div style={{ overflowX:'auto' }}>
+          <div className="ock-table-scroll">
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
               <thead>
                 <tr style={{ background:'var(--surface-inset)' }}>
@@ -334,7 +330,7 @@ window.AnalyticsScreen = function AnalyticsScreen({ toast }) {
           <span>Объекты в выборке</span>
           <NS.Badge tone="neutral">{n} объектов</NS.Badge>
         </div>
-        <div style={{ overflowX:'auto' }}>
+        <div className="ock-table-scroll">
           <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'var(--text-sm)' }}>
             <thead>
               <tr style={{ background:'var(--surface-inset)' }}>

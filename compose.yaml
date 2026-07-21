@@ -9,17 +9,20 @@ services:
       NODE_ENV: production
       PORT: 4173
       OCENKA_DB_PATH: /app/data/ocenka.sqlite
-      # Change before first start if you want another seed password.
-      OCENKA_SEED_PASSWORD: ocenka123
+      OCENKA_SEED_PASSWORD: ${OCENKA_SEED_PASSWORD:?Set OCENKA_SEED_PASSWORD in .env before first start}
+      # Set to "true" when publishing behind HTTPS / a TLS reverse proxy:
+      OCENKA_COOKIE_SECURE: ${OCENKA_COOKIE_SECURE:-false}
+      # Set to "true" only if a trusted proxy sets X-Forwarded-For:
+      OCENKA_TRUST_PROXY: ${OCENKA_TRUST_PROXY:-false}
     ports:
       - "4173:4173"
     volumes:
       - ocenka_data:/app/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4173/healthz').then(async r=>{const j=await r.json().catch(()=>null); process.exit(r.ok&&j&&j.status==='ok'?0:1)}).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
-      start_period: 10s
+      start_period: 15s
       retries: 3
 
 volumes:

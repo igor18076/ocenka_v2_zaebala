@@ -1,3 +1,8 @@
+# Production secrets and local overrides — never bake into the image.
+.env
+.env.*
+!.env.example
+
 .git
 .gitignore
 node_modules
@@ -6,7 +11,23 @@ Dockerfile
 compose.yaml
 docker-compose.yml
 .dockerignore
+
+# Local / generated databases and runtime data
 backend/db/*.sqlite
 backend/db/*.sqlite-*
+backend/db/*.sqlite-shm
+backend/db/*.sqlite-wal
 screenshots
 uploads
+test-results
+playwright-report
+.codex-run
+
+# Dev-only UI kit sources that are not needed at runtime after `npm run build`
+# (build step runs inside the image before these would matter; keep sources for the build)
+# — intentionally not excluding ui_kits source; the Docker build compiles them.
+
+# Docs / diagrams not required to run the app
+uml
+*.md
+!readme.md

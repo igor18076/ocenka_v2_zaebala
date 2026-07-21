@@ -1,3 +1,17 @@
 .codex-run/
 test-results/
 playwright-report/
+.env
+
+# Generated SQLite database (created by seed / first run)
+backend/db/*.sqlite
+backend/db/*.sqlite-shm
+backend/db/*.sqlite-wal
+backend/db/backups/
+
+# Dependencies
+node_modules/
+
+# Generated production frontend build (created by npm run build)
+ui_kits/ocenka-app-v2/build/
+ui_kits/ocenka-app-v2/index.prod.html

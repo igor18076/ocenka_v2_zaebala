@@ -11,3 +11,288 @@
 @import url('tokens/elevation.css');
 @import url('tokens/base.css');
 @import url('components/ui.css');
+
+/* App layout utilities */
+.ock-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ock-page-head__main {
+  min-width: 0;
+}
+
+.ock-page-head__title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.ock-page-head__subtitle {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+
+.ock-page-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ock-grid {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ock-grid--tight { gap: 12px; }
+.ock-grid--section { margin-bottom: 20px; }
+.ock-grid--top { align-items: start; }
+.ock-grid--kpi-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.ock-grid--kpi-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ock-grid--kpi-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ock-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ock-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ock-grid--main-side { grid-template-columns: minmax(0, 1.6fr) minmax(280px, .95fr); }
+.ock-grid--wide-side { grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); }
+.ock-grid--report { grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); }
+.ock-grid--analytics-wide { grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr); }
+.ock-grid--filters { grid-template-columns: repeat(3, minmax(180px, 1fr)) auto auto; align-items: end; }
+.ock-grid--auto-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.ock-grid--modal-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ock-grid--modal-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.ock-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ock-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ock-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, .42);
+}
+
+.ock-modal-backdrop--dark {
+  z-index: 200;
+  background: rgba(0, 0, 0, .5);
+}
+
+.ock-modal-panel {
+  width: min(100%, 620px);
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.ock-modal-panel--sm { width: min(100%, 560px); }
+.ock-modal-panel--md { width: min(100%, 620px); }
+.ock-modal-panel--lg { width: min(100%, 1080px); }
+
+.ock-modal-panel--tour { width: min(100%, 520px); outline: none; }
+.ock-modal-body {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ock-analog-manual-backdrop {
+  left: var(--sidebar-width);
+}
+
+.ock-scroll-area {
+  min-width: 0;
+  overflow: auto;
+}
+
+.ock-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ock-table-wide {
+  min-width: 900px;
+}
+
+.ock-truncate {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ock-board-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ock-board-columns {
+  display: grid;
+  grid-template-columns: repeat(6, 292px);
+  align-items: stretch;
+  gap: 12px;
+  width: max-content;
+}
+
+@media (max-width: 1100px) {
+  .ock-grid--kpi-5,
+  .ock-grid--kpi-4,
+  .ock-grid--three,
+  .ock-grid--main-side,
+  .ock-grid--wide-side,
+  .ock-grid--report,
+  .ock-grid--analytics-wide {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ock-grid--filters {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  #app {
+    flex-direction: column !important;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .ock-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    max-height: 116px;
+    flex-shrink: 0 !important;
+  }
+
+  .ock-sidebar__brand {
+    padding: 10px 14px 6px !important;
+  }
+
+  .ock-sidebar__brand img {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .ock-sidebar__nav {
+    flex: none !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 6px 10px 10px !important;
+    gap: 6px !important;
+  }
+
+  .ock-sidebar__nav button {
+    width: auto !important;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .ock-sidebar__footer {
+    display: none !important;
+  }
+
+  .ock-main {
+    min-height: 0;
+  }
+
+  .ock-topbar {
+    height: auto !important;
+    min-height: var(--topbar-height);
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .ock-topbar__search {
+    order: 3;
+    flex: 1 1 100% !important;
+    max-width: none !important;
+  }
+
+  .ock-topbar__spacer {
+    display: none !important;
+  }
+
+  .ock-topbar__profile > div {
+    display: none;
+  }
+
+  .ock-content {
+    min-width: 0;
+  }
+
+  .ock-page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ock-page-head__actions {
+    justify-content: flex-start;
+  }
+
+  .ock-grid--kpi-5,
+  .ock-grid--kpi-4,
+  .ock-grid--kpi-3,
+  .ock-grid--two,
+  .ock-grid--three,
+  .ock-grid--main-side,
+  .ock-grid--wide-side,
+  .ock-grid--report,
+  .ock-grid--analytics-wide,
+  .ock-grid--filters,
+  .ock-grid--modal-2,
+  .ock-grid--modal-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ock-modal-backdrop {
+    padding: 12px;
+    place-items: end center;
+  }
+
+  .ock-modal-panel {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+  }
+
+  .ock-analog-manual-backdrop {
+    left: 0;
+  }
+
+  .ock-board-columns {
+    grid-template-columns: repeat(6, 86vw);
+  }
+}

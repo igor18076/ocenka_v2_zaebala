@@ -1,5 +1,5 @@
 /* Report generation. window.ReportScreen */
-window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
+window.ReportScreenV2 = function ReportScreenV2({ request, toast, onNavigate }) {
   const { Card, Button, Badge, ProgressBar } = NS;
   const D = window.OcenkaData;
   const selected = request || (D.requests || []).find((item) => item.id === D.object?.id) || {};
@@ -13,17 +13,16 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     date: selected.date || D.object.date,
   };
   const savedObject = (() => {
-    try {
-      return JSON.parse(window.localStorage.getItem(`ocenka.object.${initialObject.id}.v1`) || 'null') || {};
-    } catch {
-      return {};
-    }
+    return window.readLocalJson ? window.readLocalJson(`ocenka.object.${initialObject.id}.v1`, {}) || {} : {};
   })();
   const o = { ...initialObject, ...savedObject };
   const settings = (() => {
-    try { return JSON.parse(window.localStorage.getItem('ocenka.settings.v1') || '{}'); } catch { return {}; }
+    return window.readLocalJson ? window.readLocalJson('ocenka.settings.v1', {}) || {} : {};
   })();
-  const reportSections = D.reportSections || [];
+  const reportSections = (D.reportSections || []).map((section) => ({
+    ...section,
+    done: window.OcenkaFso ? window.OcenkaFso.reportSectionDone(o.id, section.label) : !!section.done,
+  }));
   const report = D.report || {};
   const reviewStorageKey = `ocenka.report.review.${o.id}.v1`;
   const [reviewSent, setReviewSent] = React.useState(() => {
@@ -31,17 +30,11 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   });
   const [loadedReviewId, setLoadedReviewId] = React.useState(o.id);
   const calc = D.calculation || {};
-  const fmt = (n) => Math.round(n || 0).toLocaleString('ru-RU');
-  const toNum = (value, fallback = 0) => {
-    const parsed = Number(String(value ?? '').replace(',', '.').replace(/[^\d.-]/g, ''));
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
+  const V = window.OcenkaValuation;
+  const toNum = window.toNum;
+  const fmt = (n) => Math.round(toNum(n)).toLocaleString('ru-RU');
   const loadSavedCalculation = (id) => {
-    try {
-      return JSON.parse(window.localStorage.getItem(`ocenka.calculation.${id || 'draft'}.v1`) || 'null') || {};
-    } catch {
-      return {};
-    }
+    return window.readLocalJson ? window.readLocalJson(`ocenka.calculation.${id || 'draft'}.v1`, {}) || {} : {};
   };
   const savedCalc = loadSavedCalculation(o.id);
   const weights = savedCalc.weights || calc.weights || { comp:60, income:10, cost:30 };
@@ -51,30 +44,33 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
   const income = savedCalc.inc || { ...(calc.income || {}), area: subjectArea };
   const rentRows = Array.isArray(savedCalc.rentRows) && savedCalc.rentRows.length ? savedCalc.rentRows : (income.rentAnalogs || calc.income?.rentAnalogs || []);
   const cst = savedCalc.cst || { ...(calc.cost || {}), m: subjectArea };
-  const validRows = rows.filter((row) => toNum(row.price) > 0 && toNum(row.area) > 0);
-  const compValue = validRows.length ? Math.round(validRows.reduce((sum, row) => {
-    const weightSum = validRows.reduce((total, item) => total + Math.max(0, toNum(item.w)), 0) || 1;
-    const adj = 1 + (toNum(row.adjTorg) + toNum(row.adjLoc) + toNum(row.adjRep) + toNum(row.adjFlr)) / 100;
-    return sum + (toNum(row.price) / toNum(row.area, 1)) * adj * (Math.max(0, toNum(row.w)) / weightSum);
-  }, 0) * subjectArea) : 0;
-  const rentRate = rentRows.length ? Math.round(rentRows.reduce((sum, row) => {
-    const weight = toNum(row.weight);
-    const adjusted = toNum(row.rentPerM2) * (1 + (toNum(row.adjLoc) + toNum(row.adjCond)) / 100);
-    return sum + adjusted * weight;
-  }, 0) / (rentRows.reduce((sum, row) => sum + toNum(row.weight), 0) || 1)) : toNum(income.rent);
-  const pgi = Math.round(toNum(income.area) * toNum(rentRate) * 12);
-  const egi = Math.round(pgi * (1 - toNum(income.vacancy) / 100));
-  const noi = Math.round(egi * (1 - toNum(income.opex) / 100));
-  const incomeValue = toNum(income.cap) > 0 ? Math.round(noi / (toNum(income.cap) / 100)) : 0;
-  const costValue = Math.round(((toNum(cst.n) * toNum(cst.m) * toNum(cst.kPer, 1) * toNum(cst.kReg, 1) * toNum(cst.kZon, 1) * toNum(cst.kSeis, 1) * toNum(cst.kF, 1)) + toNum(cst.zd)) * toNum(cst.kInd, 1) * (1 + toNum(cst.vat) / 100));
+  /* Prefer the rent the appraiser stored on the calc screen; fall back to the analog-derived rate. */
+  const rentRate = rentRows.length ? V.rentAnalogRate(rentRows) : toNum(income.rent);
+  const incomeRent = toNum(income.rent) > 0 ? toNum(income.rent) : rentRate;
+  const compValue = V.comparative(rows, subjectArea);
+  const incomeValue = V.income({ area: income.area ?? subjectArea, rent: incomeRent, vacancy: income.vacancy, opex: income.opex, cap: income.cap }).value;
+  const costValue = V.cost(cst);
   const finalRows = [
     { key:'comp', name:'Сравнительный подход', value:compValue, weight:weights.comp ?? 60 },
     { key:'income', name:'Доходный подход', value:incomeValue, weight:weights.income ?? 10 },
     { key:'cost', name:'Затратный подход', value:costValue, weight:weights.cost ?? 30 },
   ].filter((row) => applied[row.key] !== false);
-  const finalValue = savedCalc.final || Math.round(finalRows.reduce((sum, row) => sum + toNum(row.value) * toNum(row.weight), 0) / (finalRows.reduce((sum, row) => sum + toNum(row.weight), 0) || 1));
-  const doneSections = reportSections.filter((section) => section.done).length;
-  const reportReady = Math.round((doneSections / (reportSections.length || 1)) * 100);
+  const finalValue = savedCalc.final || V.reconcile({ comp: compValue, income: incomeValue, cost: costValue }, weights, applied);
+  const liveSections = reportSections.map((section) => {
+    if (section.label === 'Итоговое заключение' && reviewSent) return { ...section, done: true };
+    return section;
+  });
+  const doneSections = liveSections.filter((section) => section.done).length;
+  const reportReady = Math.round((doneSections / (liveSections.length || 1)) * 100);
+  const ensureFsoReady = () => {
+    if (settings.fsoAutocheck === false) return true;
+    const open = window.OcenkaFso ? window.OcenkaFso.openCount(o.id) : 0;
+    if (open <= 0) return true;
+    if (toast) toast(`Сначала закройте пункты ФСО (${open} открыто)`);
+    if (onNavigate) onNavigate('fso');
+    else if (window.ocenkaGoTo) window.ocenkaGoTo('fso');
+    return false;
+  };
   React.useEffect(() => {
     try {
       setReviewSent(window.localStorage.getItem(reviewStorageKey) === '1');
@@ -90,25 +86,39 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     } catch {}
   }, [reviewStorageKey, loadedReviewId, o.id, reviewSent]);
   const cell = { padding:'8px 10px', borderBottom:'1px solid var(--divider)', fontSize:'var(--text-sm)' };
-  const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${o.id}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.photo{height:88px;border:1px solid #ccc;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#555}</style></head><body><h1>Отчет об оценке №${o.id}</h1><p><b>Объект:</b> ${o.title}</p><p><b>Адрес:</b> ${o.address}</p><p><b>Заказчик:</b> ${o.client}</p><p><b>Оценщик:</b> ${settings.name || window.OcenkaData.user?.name || 'Игорь Дорощенко'}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p>${settings.includePhotos !== false ? `<h2>Фотографии объекта</h2><div class="photos">${Array.from({ length: Math.min(toNum(o.photos), 6) }).map((_, index) => `<div class="photo">Фото ${index + 1}</div>`).join('')}</div>` : ''}<h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = toNum(row.adjLoc) + toNum(row.adjCond); const adjusted = Math.round(toNum(row.rentPerM2) * (1 + correction / 100)); return `<tr><td>${row.addr}</td><td class="num">${fmt(toNum(row.rentPerM2))}</td><td class="num">${correction}%</td><td class="num">${toNum(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${row.name}</td><td class="num">${fmt(toNum(row.value))} ₽</td><td class="num">${toNum(row.weight).toFixed(2)}%</td><td class="num">${fmt(toNum(row.value) * toNum(row.weight) / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[char]));
+  const reportId = escapeHtml(o.id);
+  const reportTitle = escapeHtml(o.title);
+  const reportAddress = escapeHtml(o.address);
+  const reportClient = escapeHtml(o.client);
+  const reportEvaluator = escapeHtml(settings.name || window.OcenkaData.user?.name || 'Игорь Дорощенко');
+  const photoUrls = Array.isArray(o.photoUrls) ? o.photoUrls.filter(Boolean).slice(0, 6) : [];
+  const photosHtml = settings.includePhotos === false
+    ? ''
+    : photoUrls.length
+      ? `<h2>Фотографии объекта</h2><div class="photos">${photoUrls.map((src, index) => `<img class="photo" src="${String(src).replace(/"/g, '&quot;')}" alt="Фото ${index + 1}" style="width:100%;height:88px;object-fit:cover;border:1px solid #ccc;background:#f3f4f6">`).join('')}</div>`
+      : `<h2>Фотографии объекта</h2><div class="photos">${Array.from({ length: Math.min(toNum(o.photos), 6) }).map((_, index) => `<div class="photo">Фото ${index + 1}</div>`).join('')}</div>`;
+  const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${reportId}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.photo{height:88px;border:1px solid #ccc;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#555}</style></head><body><h1>Отчет об оценке №${reportId}</h1><p><b>Объект:</b> ${reportTitle}</p><p><b>Адрес:</b> ${reportAddress}</p><p><b>Заказчик:</b> ${reportClient}</p><p><b>Оценщик:</b> ${reportEvaluator}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p>${photosHtml}<h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = toNum(row.adjLoc) + toNum(row.adjCond); const adjusted = Math.round(toNum(row.rentPerM2) * (1 + correction / 100)); return `<tr><td>${escapeHtml(row.addr)}</td><td class="num">${fmt(toNum(row.rentPerM2))}</td><td class="num">${correction}%</td><td class="num">${toNum(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td class="num">${fmt(toNum(row.value))} ₽</td><td class="num">${toNum(row.weight).toFixed(2)}%</td><td class="num">${fmt(toNum(row.value) * toNum(row.weight) / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
   const downloadDoc = () => {
+    if (!ensureFsoReady()) return;
     const blob = new Blob([reportHtml()], { type:'application/msword;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `report-${o.id}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    window.downloadBlob(blob, `report-${o.id}.doc`);
     toast('Файл DOC сформирован и загружается');
   };
   const openPdfPrint = () => {
+    if (!ensureFsoReady()) return;
     const win = window.open('', '_blank');
     if (!win) {
       toast('Разрешите всплывающие окна для печати PDF');
       return;
     }
+    win.opener = null;
     win.document.write(reportHtml());
     win.document.close();
     win.focus();
@@ -119,15 +129,42 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
     else downloadDoc();
   };
   const sendToReview = () => {
+    if (!ensureFsoReady()) return;
     setReviewSent(true);
-    toast(settings.notifyClient ? 'Отчет отправлен на проверку, клиент будет уведомлен' : 'Отчет отправлен на проверку');
+    try {
+      window.localStorage.setItem(`ocenka.report.review.${o.id}.v1`, '1');
+    } catch {}
+    const kanbanKey = 'ocenka.requests.kanban.v1';
+    const current = window.readLocalJson ? window.readLocalJson(kanbanKey, null) : null;
+    const base = Array.isArray(current) ? current : (window.OcenkaData.requests || []);
+    let found = false;
+    const next = base.map((item) => {
+      if (item.id !== o.id) return item;
+      found = true;
+      return { ...item, status: 'review' };
+    });
+    if (!found) {
+      next.unshift({
+        id: o.id,
+        object: o.title || 'Объект',
+        address: o.address || '',
+        client: o.client || '',
+        type: (o.valueType || 'Рыночная').replace(/\s*стоимость$/i, '') || 'Рыночная',
+        status: 'review',
+        date: o.date || new Date().toLocaleDateString('ru-RU'),
+        owner: settings.name || window.OcenkaData.user?.name || '—',
+      });
+    }
+    if (window.writeLocalJson) window.writeLocalJson(kanbanKey, next);
+    window.dispatchEvent(new CustomEvent('ocenka:requests-updated', { detail: { id: o.id, status: 'review' } }));
+    toast('Отчет на проверке · заявка переведена в колонку «Проверка»');
   };
 
   return (
     <div>
       <PageHead title="Отчет об оценке" subtitle={`Заявка ${o.id} · отчет №${o.id}`} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="ock-grid ock-grid--report ock-grid--top">
         {/* Report preview card */}
         <Card>
           <div style={{ display: 'flex', gap: 20 }}>
@@ -155,7 +192,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
                 <Badge tone={reviewSent ? 'warning' : 'success'} pill dot={!reviewSent}>{reviewSent ? 'На проверке' : 'Готов к формированию'}</Badge>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px', marginTop: 20 }}>
+              <div className="ock-grid ock-grid--two" style={{ gap:'14px 20px', marginTop:20 }}>
                 <DetailField label="Вид стоимости" value={o.valueType} />
                 <DetailField label="Итоговая стоимость" value={`${fmt(finalValue)} ₽`} />
                 <DetailField label="Дата оценки" value={o.date} />
@@ -178,8 +215,8 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <ProgressBar label="Готовность документа" value={reportReady} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 11, marginTop: 4 }}>
-              {reportSections.map(({ label, done: ok }, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)' }}>
+              {liveSections.map(({ label, done: ok }, i) => (
+                <div key={label || i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--text-sm)' }}>
                   <span style={{ color: ok ? 'var(--success)' : 'var(--text-subtle)', display: 'inline-flex' }}>
                     <Icon n={ok ? 'circle-check-big' : 'circle-dashed'} size={17} />
                   </span>
@@ -190,9 +227,9 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
           </div>
         </Card>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginTop:20, alignItems:'start' }}>
+      <div className="ock-grid ock-grid--two ock-grid--top" style={{ marginTop:20 }}>
         <Card title="Таблица 6 · Расчет доходным методом">
-          <div style={{ overflowX:'auto' }}>
+          <div className="ock-table-scroll">
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
                 <tr>
@@ -221,7 +258,7 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast }) {
           </div>
         </Card>
         <Card title="Таблица 8 · Финальный расчет">
-          <div style={{ overflowX:'auto' }}>
+          <div className="ock-table-scroll">
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
               <thead>
                 <tr>

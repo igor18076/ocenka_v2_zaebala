@@ -184,6 +184,54 @@ CREATE TABLE IF NOT EXISTS calculation_settings (
   cost TEXT NOT NULL CHECK (json_valid(cost))
 );
 
+-- Raw real-estate listings imported from Inpars/Avito CSV exports.
+-- This is the canonical "real" market dataset; analytics_properties is
+-- derived from it (see backend/scripts/import-inpars.js).
+CREATE TABLE IF NOT EXISTS listings (
+  id TEXT PRIMARY KEY,
+  published_at TEXT,
+  updated_at TEXT,
+  deal_type TEXT,
+  category TEXT,
+  source TEXT,
+  city TEXT,
+  address TEXT,
+  metro TEXT,
+  floor TEXT,
+  floors TEXT,
+  area REAL,
+  land_area REAL,
+  price INTEGER,
+  price_raw TEXT,
+  phone TEXT,
+  phone_protected TEXT,
+  contact_name TEXT,
+  agent TEXT,
+  url TEXT,
+  material TEXT,
+  description TEXT,
+  images TEXT,
+  price_per_m2 INTEGER,
+  year INTEGER,
+  use_type TEXT,
+  import_batch TEXT,
+  imported_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
+CREATE INDEX IF NOT EXISTS idx_listings_city ON listings(city);
+CREATE INDEX IF NOT EXISTS idx_listings_deal_type ON listings(deal_type);
+
+-- Durable sessions (survive process restarts; single-instance).
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  login TEXT NOT NULL,
+  name TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS calculation_comparable_rows (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,

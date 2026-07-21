@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Syntax check
+        run: npm run check
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Seed + import market data
+        env:
+          OCENKA_SEED_PASSWORD: ci-test-password
+        run: |
+          npm run db:seed -- --force
+          npm run db:import
+
+      - name: Production build
+        run: npm run build
+
+      - name: Smoke
+        env:
+          OCENKA_SEED_PASSWORD: ci-test-password
+        run: npm run smoke

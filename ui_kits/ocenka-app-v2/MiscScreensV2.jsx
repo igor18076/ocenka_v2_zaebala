@@ -4,28 +4,30 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
   const D = window.OcenkaData;
   const storageKey = 'ocenka.clients.v1';
   const [clients, setClients] = React.useState(() => {
-    try {
-      const saved = window.localStorage.getItem(storageKey);
-      const parsed = saved ? JSON.parse(saved) : null;
-      return Array.isArray(parsed) ? parsed : (D.clients || []);
-    } catch {
-      return D.clients || [];
-    }
+    const parsed = window.readLocalJson ? window.readLocalJson(storageKey, null) : null;
+    return Array.isArray(parsed) ? parsed : (D.clients || []);
   });
   const [query, setQuery] = React.useState('');
   const [modalOpen, setModalOpen] = React.useState(false);
   const [editingIndex, setEditingIndex] = React.useState(null);
   const emptyClient = { name:'', kind:'Юр. лицо', orders:0, contact:'', inn:'0000000000', legalAddress:'Юридический адрес не указан' };
   const [draft, setDraft] = React.useState(emptyClient);
+  window.useEscapeToClose(modalOpen, () => setModalOpen(false));
   const toInt = (value, fallback = 0) => {
     const parsed = Number(String(value ?? '').replace(/[^\d-]/g, ''));
     return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : fallback;
   };
   React.useEffect(() => {
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(clients));
-    } catch {}
+    if (window.writeLocalJson) window.writeLocalJson(storageKey, clients);
   }, [clients]);
+  React.useEffect(() => {
+    const reload = () => {
+      const parsed = window.readLocalJson ? window.readLocalJson(storageKey, null) : null;
+      if (Array.isArray(parsed)) setClients(parsed);
+    };
+    window.addEventListener('ocenka:clients-updated', reload);
+    return () => window.removeEventListener('ocenka:clients-updated', reload);
+  }, []);
   const filtered = clients.filter((client) => [client.name, client.kind, client.contact, client.inn, client.legalAddress].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
   const fieldLabel = { display:'block', marginBottom:6, fontSize:'var(--text-xs)', fontWeight:700, color:'var(--text-muted)' };
   const inputStyle = { width:'100%', boxSizing:'border-box', border:'1px solid var(--border-default)', borderRadius:'var(--radius-sm)', padding:'8px 10px', color:'var(--text-strong)', background:'var(--surface-card)', fontFamily:'var(--font-sans)', fontSize:'var(--text-sm)', outline:'none' };
@@ -95,8 +97,8 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
         </div>
       </Card>
       {modalOpen ? (
-        <div style={{ position:'fixed', inset:0, zIndex:60, background:'rgba(15, 23, 42, .42)', display:'grid', placeItems:'center', padding:24 }} onMouseDown={() => setModalOpen(false)}>
-          <form onSubmit={saveClient} onMouseDown={(event) => event.stopPropagation()} style={{ width:'min(100%, 620px)', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow-lg)', overflow:'hidden' }}>
+        <div className="ock-modal-backdrop" onMouseDown={() => setModalOpen(false)}>
+          <form className="ock-modal-panel ock-modal-panel--md" role="dialog" aria-modal="true" aria-label={editingIndex == null ? 'Новый клиент' : 'Редактирование клиента'} onSubmit={saveClient} onMouseDown={(event) => event.stopPropagation()}>
             <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--divider)', display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
               <div>
                 <div style={{ fontSize:'var(--text-lg)', fontWeight:800, color:'var(--text-strong)' }}>{editingIndex == null ? 'Новый клиент' : 'Редактирование клиента'}</div>
@@ -108,7 +110,7 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
             </div>
             <div style={{ padding:20, display:'grid', gap:14 }}>
               <Input label="Клиент" required value={draft.name} onChange={(event) => setDraft((prev) => ({ ...prev, name:event.target.value }))} />
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div className="ock-grid ock-grid--modal-2" style={{ gap:12 }}>
                 <div>
                   <label style={fieldLabel}>Тип</label>
                   <select value={draft.kind} onChange={(event) => setDraft((prev) => ({ ...prev, kind:event.target.value }))} style={inputStyle}>
@@ -148,52 +150,94 @@ window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
 window.SettingsScreenV2 = function SettingsScreenV2({ toast }) {
   const { Card, Input, Select, Switch, Button } = NS;
   const savedSettings = (() => {
-    try { return JSON.parse(window.localStorage.getItem('ocenka.settings.v1') || '{}'); } catch { return {}; }
+    return window.readLocalJson ? window.readLocalJson('ocenka.settings.v1', {}) || {} : {};
   })();
   const [settings, setSettings] = React.useState({
     name: savedSettings.name || window.OcenkaData.user?.name || 'Игорь Дорощенко',
     registry: savedSettings.registry || '012458',
+    sro: savedSettings.sro || 'a',
     email: savedSettings.email || 'i.doroshenko@ocenka.pro',
     reportFormat: savedSettings.reportFormat || 'doc',
     fsoAutocheck: savedSettings.fsoAutocheck ?? true,
     includePhotos: savedSettings.includePhotos ?? true,
-    notifyClient: savedSettings.notifyClient ?? false,
   });
+  const [passwordDraft, setPasswordDraft] = React.useState({ current: '', next: '', confirm: '' });
+  const [passwordBusy, setPasswordBusy] = React.useState(false);
   const setSetting = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
   const saveSettings = () => {
-    try {
-      window.localStorage.setItem('ocenka.settings.v1', JSON.stringify(settings));
-    } catch {}
+    if (window.writeLocalJson) window.writeLocalJson('ocenka.settings.v1', settings);
     window.dispatchEvent(new Event('ocenka:settings-updated'));
     if (toast) toast('Настройки сохранены');
+  };
+  const changePassword = async (event) => {
+    event.preventDefault();
+    if (passwordBusy) return;
+    setPasswordBusy(true);
+    try {
+      const body = new URLSearchParams({
+        current: passwordDraft.current,
+        next: passwordDraft.next,
+        confirm: passwordDraft.confirm,
+      });
+      const response = await fetch('/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+        credentials: 'same-origin',
+      });
+      const payload = await response.json().catch(() => ({ status: 'error', message: 'Ошибка ответа сервера' }));
+      if (!response.ok || payload.status !== 'ok') {
+        if (toast) toast(payload.message || 'Не удалось сменить пароль');
+        return;
+      }
+      setPasswordDraft({ current: '', next: '', confirm: '' });
+      if (toast) toast(payload.message || 'Пароль обновлён');
+    } catch {
+      if (toast) toast('Не удалось сменить пароль');
+    } finally {
+      setPasswordBusy(false);
+    }
   };
   return (
     <div>
       <PageHead title="Настройки" subtitle="Профиль оценщика и параметры формирования отчетов" />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="ock-grid ock-grid--two ock-grid--top">
         <div data-tour-id="settings-profile">
         <Card title="Профиль оценщика">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Input label="ФИО" value={settings.name} onChange={(event) => setSetting('name', event.target.value)} />
             <Input label="№ в реестре СРО" value={settings.registry} onChange={(event) => setSetting('registry', event.target.value)} style={{ fontFamily:'var(--font-mono)' }} />
-            <Select label="Саморегулируемая организация" options={[
+            <Select label="Саморегулируемая организация" value={settings.sro} onChange={(event) => setSetting('sro', event.target.value)} options={[
               { value: 'a', label: 'СРО «Российское общество оценщиков»' },
               { value: 'b', label: 'СРО «СМАО»' },
             ]} />
             <Input label="E-mail" value={settings.email} onChange={(event) => setSetting('email', event.target.value)} />
           </div>
         </Card>
+        <Card title="Смена пароля" style={{ marginTop: 20 }}>
+          <form onSubmit={changePassword} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <Input label="Текущий пароль" type="password" required value={passwordDraft.current} onChange={(event) => setPasswordDraft((p) => ({ ...p, current: event.target.value }))} autoComplete="current-password" />
+            <Input label="Новый пароль" type="password" required value={passwordDraft.next} onChange={(event) => setPasswordDraft((p) => ({ ...p, next: event.target.value }))} autoComplete="new-password" />
+            <Input label="Повтор нового пароля" type="password" required value={passwordDraft.confirm} onChange={(event) => setPasswordDraft((p) => ({ ...p, confirm: event.target.value }))} autoComplete="new-password" />
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Минимум 8 символов. Пароль хранится в SQLite (PBKDF2), без REST API.</div>
+            <div>
+              <Button type="submit" variant="secondary" disabled={passwordBusy}>{passwordBusy ? 'Сохранение…' : 'Сменить пароль'}</Button>
+            </div>
+          </form>
+        </Card>
         </div>
         <Card title="Параметры отчетов">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Select label="Формат по умолчанию" value={settings.reportFormat} onChange={(event) => setSetting('reportFormat', event.target.value)} options={[
               { value: 'doc', label: 'DOC' },
-              { value: 'pdf', label: 'PDF' },
+              { value: 'pdf', label: 'PDF (печать)' },
             ]} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 4 }}>
               <Switch label="Автопроверка по ФСО перед формированием" checked={settings.fsoAutocheck} onChange={(event) => setSetting('fsoAutocheck', event.target.checked)} />
               <Switch label="Добавлять фотографии в отчет" checked={settings.includePhotos} onChange={(event) => setSetting('includePhotos', event.target.checked)} />
-              <Switch label="Уведомлять заказчика по e-mail" checked={settings.notifyClient} onChange={(event) => setSetting('notifyClient', event.target.checked)} />
+            </div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+              Отправка e-mail заказчику не подключена — отчёт можно скачать или распечатать вручную.
             </div>
             <div style={{ paddingTop: 8 }}>
               <Button variant="primary" onClick={saveSettings}>Сохранить изменения</Button>

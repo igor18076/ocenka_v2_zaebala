@@ -95,6 +95,14 @@
       placement: 'left',
     },
     {
+      id: 'analogs-market',
+      route: 'analogs',
+      target: 'analogs-market',
+      title: 'Рыночная база',
+      text: 'Фильтруйте реальные объявления Inpars/Avito и добавляйте подходящие в подборку аналогов кнопкой «В аналоги».',
+      placement: 'bottom',
+    },
+    {
       id: 'analogs',
       route: 'analogs',
       target: 'analogs-table',
@@ -254,18 +262,12 @@
   window.OcenkaTourSteps = TOUR_STEPS;
 
   function readState() {
-    try {
-      const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null');
-      return parsed && typeof parsed === 'object' ? parsed : { status: 'new', stepIndex: 0, autoDisabled: false };
-    } catch {
-      return { status: 'new', stepIndex: 0, autoDisabled: false };
-    }
+    const parsed = window.readLocalJson ? window.readLocalJson(STORAGE_KEY, null) : null;
+    return parsed && typeof parsed === 'object' ? parsed : { status: 'new', stepIndex: 0, autoDisabled: false };
   }
 
   function saveState(next) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {}
+    if (window.writeLocalJson) window.writeLocalJson(STORAGE_KEY, next);
   }
 
   function clampStep(value) {
@@ -286,22 +288,41 @@
   }
 
   function panelPosition(rect, placement) {
-    const width = Math.min(380, window.innerWidth - 32);
-    const height = 230;
-    const gap = 14;
-    let top = Math.max(16, Math.min(window.innerHeight - height - 16, rect.top));
-    let left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.right + gap));
+    const margin = 16;
+    const gap = 16;
+    const width = Math.min(380, window.innerWidth - margin * 2);
+    const height = 240;
+    const clampTop = (value) => Math.max(margin, Math.min(window.innerHeight - height - margin, value));
+    const clampLeft = (value) => Math.max(margin, Math.min(window.innerWidth - width - margin, value));
 
-    if (placement === 'left') left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.left - width - gap));
-    if (placement === 'bottom') {
-      top = Math.max(16, Math.min(window.innerHeight - height - 16, rect.bottom + gap));
-      left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.left));
+    /* Free space available on each side of the target. */
+    const space = {
+      bottom: window.innerHeight - rect.bottom - gap,
+      top: rect.top - gap,
+      right: window.innerWidth - rect.right - gap,
+      left: rect.left - gap,
+    };
+    const fits = {
+      bottom: space.bottom >= height,
+      top: space.top >= height,
+      right: space.right >= width,
+      left: space.left >= width,
+    };
+    /* Prefer the requested placement, then any side that fits, then the roomiest. */
+    const order = [placement, 'bottom', 'top', 'right', 'left'].filter((value, index, all) => all.indexOf(value) === index);
+    let side = order.find((candidate) => fits[candidate]);
+    if (!side) side = Object.keys(space).sort((a, b) => space[b] - space[a])[0];
+
+    let top;
+    let left;
+    if (side === 'bottom' || side === 'top') {
+      left = clampLeft(rect.left + rect.width / 2 - width / 2);
+      top = side === 'bottom' ? rect.bottom + gap : rect.top - height - gap;
+    } else {
+      top = clampTop(rect.top + rect.height / 2 - height / 2);
+      left = side === 'right' ? rect.right + gap : rect.left - width - gap;
     }
-    if (placement === 'top') {
-      top = Math.max(16, Math.min(window.innerHeight - height - 16, rect.top - height - gap));
-      left = Math.max(16, Math.min(window.innerWidth - width - 16, rect.left));
-    }
-    return { top, left, width };
+    return { top: clampTop(top), left: clampLeft(left), width };
   }
 
   function buttonStyle(kind) {
@@ -330,8 +351,8 @@
       window.setTimeout(() => ref.current && ref.current.focus(), 0);
     }, []);
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:120, background:'rgba(15,23,42,.42)', display:'grid', placeItems:'center', padding:24 }} role="presentation">
-        <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} style={{ width:'min(100%, 520px)', background:'var(--surface-card)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-lg)', boxShadow:'var(--shadow-lg)', overflow:'hidden', outline:'none' }}>
+      <div className="ock-modal-backdrop" style={{ zIndex:120 }} role="presentation">
+        <div ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className="ock-modal-panel ock-modal-panel--tour">
           <div style={{ padding:'18px 20px', borderBottom:'1px solid var(--divider)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
             <div>
               <div style={{ fontSize:'var(--text-lg)', fontWeight:800, color:'var(--text-strong)' }}>{title}</div>
@@ -602,7 +623,10 @@
 
     return (
       <div style={{ position:'fixed', inset:0, zIndex:110, pointerEvents:'none' }} aria-live="polite">
-        <div style={{ position:'absolute', inset:0, background:'rgba(15,23,42,.20)' }} />
+        {/* No highlight yet → dim the whole screen so the centered card stays readable.
+            With a highlight, the spotlight shadow below handles the dimming and the
+            target area is left fully bright for a strong, expressive accent. */}
+        {highlight ? null : <div style={{ position:'absolute', inset:0, background:'rgba(15,23,42,.55)' }} />}
         {highlight ? (
           <div style={{
             position:'fixed',
@@ -610,10 +634,10 @@
             left:highlight.left,
             width:highlight.width,
             height:highlight.height,
-            border:'2px solid var(--emerald-400)',
+            border:'2px solid var(--emerald-300)',
             borderRadius:'var(--radius-lg)',
-            boxShadow:'0 0 0 9999px rgba(15,23,42,.18), 0 0 0 6px rgba(93,195,147,.22)',
-            transition:'all .18s var(--ease-out)',
+            boxShadow:'0 0 0 9999px rgba(15,23,42,.68), 0 0 0 4px rgba(93,195,147,.55), 0 0 26px 6px rgba(93,195,147,.45)',
+            transition:'all .2s var(--ease-out)',
           }} />
         ) : null}
         <div
