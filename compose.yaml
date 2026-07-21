@@ -10,12 +10,12 @@ services:
       PORT: 4173
       OCENKA_DB_PATH: /app/data/ocenka.sqlite
       OCENKA_SEED_PASSWORD: ${OCENKA_SEED_PASSWORD:?Set OCENKA_SEED_PASSWORD in .env before first start}
-      # Set to "true" when publishing behind HTTPS / a TLS reverse proxy:
+      # true behind HTTPS domain (see OCENKA_DOMAIN):
       OCENKA_COOKIE_SECURE: ${OCENKA_COOKIE_SECURE:-false}
-      # Set to "true" only if a trusted proxy sets X-Forwarded-For:
-      OCENKA_TRUST_PROXY: ${OCENKA_TRUST_PROXY:-false}
-    ports:
-      - "4173:4173"
+      OCENKA_TRUST_PROXY: ${OCENKA_TRUST_PROXY:-true}
+    # No public ports — only reachable via the proxy on the Docker network.
+    expose:
+      - "4173"
     volumes:
       - ocenka_data:/app/data
     healthcheck:
@@ -25,5 +25,25 @@ services:
       start_period: 15s
       retries: 3
 
+  proxy:
+    image: caddy:2-alpine
+    container_name: ocenka-proxy
+    restart: unless-stopped
+    depends_on:
+      - ocenka
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      OCENKA_DOMAIN: ${OCENKA_DOMAIN:-}
+      OCENKA_ACME_EMAIL: ${OCENKA_ACME_EMAIL:-}
+    volumes:
+      - ./deploy/caddy-entrypoint.sh:/entrypoint.sh:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+
 volumes:
   ocenka_data:
+  caddy_data:
+  caddy_config:

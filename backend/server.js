@@ -856,8 +856,16 @@ function isDevOnlyAsset(decodedPath) {
 
 function staticCacheControl(decodedPath) {
   if (!useProductionBuild) return undefined;
+  /* HTML entry must always revalidate so ?v= stamps on scripts take effect. */
+  if (decodedPath.endsWith('/index.html') || decodedPath.endsWith('/index.prod.html')) {
+    return 'no-store';
+  }
+  if (decodedPath.includes('/data.js')) {
+    return 'no-store';
+  }
+  /* Fingerprinted build assets may be cached briefly; query ?v= changes on each build. */
   if (decodedPath.includes('/build/') || decodedPath.includes('/vendor/') || decodedPath.endsWith('.css')) {
-    return 'public, max-age=3600';
+    return 'public, max-age=300, must-revalidate';
   }
   return undefined;
 }
@@ -992,7 +1000,8 @@ function sendStatic(req, res) {
       res,
       200,
       `window.OcenkaData = ${serializeForScript(data)};\n`,
-      'text/javascript; charset=utf-8'
+      'text/javascript; charset=utf-8',
+      'no-store'
     );
     return;
   }
@@ -1003,7 +1012,7 @@ function sendStatic(req, res) {
         send(res, 500, 'Server error', 'text/plain; charset=utf-8');
         return;
       }
-      send(res, 200, body, 'text/html; charset=utf-8');
+      send(res, 200, body, 'text/html; charset=utf-8', 'no-store');
     });
     return;
   }

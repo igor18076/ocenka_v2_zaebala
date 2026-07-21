@@ -4,7 +4,7 @@
  *
  * Creates .env (with a generated password) if missing, then:
  *   docker compose up -d --build
- * and waits until /healthz reports ok.
+ * and waits until /healthz reports ok (via Caddy on port 80).
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -15,7 +15,6 @@ const { spawnSync } = require('node:child_process');
 const rootDir = path.resolve(__dirname, '..', '..');
 const envPath = path.join(rootDir, '.env');
 const envExample = path.join(rootDir, '.env.example');
-const healthPort = 4173;
 
 function readEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {};
@@ -34,7 +33,7 @@ function ensureEnv() {
   if (fs.existsSync(envPath)) {
     const existing = readEnvFile(envPath);
     if (existing.OCENKA_SEED_PASSWORD && existing.OCENKA_SEED_PASSWORD !== 'replace-with-strong-password') {
-      return { created: false, password: existing.OCENKA_SEED_PASSWORD };
+      return { created: false, password: existing.OCENKA_SEED_PASSWORD, env: existing };
     }
   }
 
@@ -46,7 +45,7 @@ function ensureEnv() {
     ? base.replace(/OCENKA_SEED_PASSWORD=.*/m, `OCENKA_SEED_PASSWORD=${password}`)
     : `${base.trim()}\nOCENKA_SEED_PASSWORD=${password}\n`;
   fs.writeFileSync(envPath, next.endsWith('\n') ? next : `${next}\n`);
-  return { created: true, password };
+  return { created: true, password, env: readEnvFile(envPath) };
 }
 
 function run(command, args) {
@@ -60,9 +59,9 @@ function run(command, args) {
   if (result.status !== 0) process.exit(result.status || 1);
 }
 
-function probeHealth() {
+function probeHealth(port) {
   return new Promise((resolve) => {
-    const req = http.get({ host: '127.0.0.1', port: healthPort, path: '/healthz', timeout: 2000 }, (res) => {
+    const req = http.get({ host: '127.0.0.1', port, path: '/healthz', timeout: 2000 }, (res) => {
       let body = '';
       res.setEncoding('utf8');
       res.on('data', (chunk) => { body += chunk; });
@@ -84,7 +83,7 @@ async function waitHealthy(timeoutMs = 120000) {
   const started = Date.now();
   process.stdout.write('Ожидание готовности');
   while (Date.now() - started < timeoutMs) {
-    if (await probeHealth()) {
+    if (await probeHealth(80) || await probeHealth(4173)) {
       process.stdout.write('\n');
       return true;
     }
@@ -106,23 +105,28 @@ async function main() {
     process.exit(1);
   }
 
-  const { created, password } = ensureEnv();
+  const { created, password, env } = ensureEnv();
   console.log(created ? `Создан .env, пароль входа: ${password}` : 'Используется существующий .env');
-  console.log('Сборка и запуск контейнера...');
+  console.log('Сборка и запуск контейнеров (приложение + Caddy)...');
   run('docker', ['compose', 'up', '-d', '--build']);
 
   const ok = await waitHealthy();
   if (!ok) {
-    console.error('Контейнер не ответил на /healthz вовремя. Смотрите: docker compose logs -f');
+    console.error('Сервис не ответил на /healthz вовремя. Смотрите: docker compose logs -f');
     process.exit(1);
   }
 
+  const domain = String(env.OCENKA_DOMAIN || '').trim();
+  const publicUrl = domain ? `https://${domain}/` : 'http://localhost/';
+
   console.log('');
   console.log('Готово.');
-  console.log('  URL:   http://localhost:4173/');
+  console.log(`  URL:   ${publicUrl}`);
+  if (!domain) console.log('  (или http://IP_СЕРВЕРА/ — порт 80, без :4173)');
   console.log('  Логин: ocenka');
   console.log(`  Пароль: ${password}`);
   console.log('');
+  console.log('Домен:  пропишите A-запись на IP сервера и задайте OCENKA_DOMAIN в .env');
   console.log('Логи:   docker compose logs -f');
   console.log('Стоп:   docker compose down');
 }

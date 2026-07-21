@@ -4,14 +4,16 @@
 
 ## Деплой (один шаг)
 
-Нужен только [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+Нужен [Docker](https://www.docker.com/products/docker-desktop/) (на сервере — Docker Engine + Compose).
 
 ```bash
 npm run deploy
 ```
 
-Откройте **http://localhost:4173/**  
+Откройте **http://IP_СЕРВЕРА/** (порт 80, без `:4173`).  
 Логин: `ocenka` · пароль печатается в консоль (и пишется в `.env`).
+
+Снаружи слушает **Caddy** (80/443), приложение внутри сети Docker на `4173` не публикуется.
 
 ```bash
 docker compose logs -f   # логи
@@ -19,7 +21,38 @@ docker compose down      # остановить
 docker compose down -v   # остановить и стереть базу
 ```
 
-Повторный `npm run deploy` пересобирает образ и поднимает контейнер; данные в volume `ocenka_data` сохраняются.
+## Домен и HTTPS
+
+1. В DNS у регистратора создайте **A-запись**: `ocenka.example.com` → IP сервера.
+2. Откройте на сервере порты **80** и **443** (firewall / security group).
+3. В `.env`:
+
+```bash
+OCENKA_DOMAIN=ocenka.example.com
+OCENKA_ACME_EMAIL=you@example.com
+OCENKA_TRUST_PROXY=true
+# после проверки, что https:// домен открывается:
+OCENKA_COOKIE_SECURE=true
+```
+
+4. Перезапуск proxy:
+
+```bash
+docker compose up -d
+```
+
+Caddy сам получит сертификат Let's Encrypt. Сайт: **https://ocenka.example.com/**  
+По IP по-прежнему доступен **http://IP/** (пока не отключите блок `http://` в entrypoint).
+
+## Обновление на сервере
+
+```bash
+cd ~/ocenka
+git pull origin main
+docker compose build --no-cache
+docker compose up -d
+# в браузере: Ctrl+Shift+R
+```
 
 ## Разработка без Docker
 
@@ -31,24 +64,7 @@ npm run db:import
 npm start
 ```
 
-Production локально: `npm run start:prod`.
-
-## HTTPS (по желанию)
-
-В `.env`:
-
-```bash
-OCENKA_COOKIE_SECURE=true
-OCENKA_TRUST_PROXY=true
-```
-
-Caddy:
-
-```caddy
-ocenka.example.com {
-  reverse_proxy 127.0.0.1:4173
-}
-```
+Production локально: `npm run start:prod` → http://localhost:4173/
 
 ## Проверки
 
