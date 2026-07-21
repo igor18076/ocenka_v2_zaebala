@@ -47,7 +47,7 @@ function migrateLegacyStorage() {
       }
       window.localStorage.removeItem(key);
     });
-    const kanbanKey = 'ocenka.requests.kanban.v1';
+    const kanbanKey = 'ocenka.requests.kanban.v2';
     const rows = window.safeJsonParse ? window.safeJsonParse(window.localStorage.getItem(kanbanKey), null) : null;
     if (Array.isArray(rows)) {
       window.localStorage.setItem(kanbanKey, JSON.stringify(rows.map(normalizeRequestRow)));

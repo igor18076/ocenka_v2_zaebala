@@ -424,7 +424,11 @@ window.CalcScreenV2 = function CalcScreenV2({ request, onNavigate, toast }) {
               </div>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div data-tour-id="calc-income-rent" style={{ background:'var(--surface-card)', border:'1px dashed var(--border-default)', borderRadius:'var(--radius-lg)', padding:'18px 20px', marginBottom:16, color:'var(--text-muted)', fontSize:'var(--text-sm)', lineHeight:1.45 }}>
+            Арендные аналоги пока не добавлены. Их можно передать из раздела «Аналоги» или ввести ставку вручную в параметрах выше.
+          </div>
+        )}
         <div data-tour-id="calc-income-final" style={{ background:'var(--emerald-50)', border:'1.5px solid var(--emerald-300)', borderRadius:'var(--radius-lg)', padding:'20px 24px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
           <div>
             <div style={{ fontWeight:600, color:'var(--emerald-700)' }}>Стоимость по доходному подходу</div>

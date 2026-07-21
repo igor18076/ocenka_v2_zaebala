@@ -113,7 +113,7 @@ window.setActiveRequestId = function setActiveRequestId(id) {
   } catch {}
 };
 window.loadKanbanRequests = function loadKanbanRequests() {
-  const saved = window.readLocalJson ? window.readLocalJson('ocenka.requests.kanban.v1', null) : null;
+  const saved = window.readLocalJson ? window.readLocalJson('ocenka.requests.kanban.v2', null) : null;
   if (Array.isArray(saved)) return saved;
   return (window.OcenkaData && window.OcenkaData.requests) || [];
 };

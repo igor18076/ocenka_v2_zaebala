@@ -4,7 +4,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
   const D = window.OcenkaData;
   const loadRequests = () => {
     try {
-      const saved = window.readLocalJson ? window.readLocalJson('ocenka.requests.kanban.v1', null) : null;
+      const saved = window.readLocalJson ? window.readLocalJson('ocenka.requests.kanban.v2', null) : null;
       return Array.isArray(saved) ? saved : (D.requests || []);
     } catch {
       return D.requests || [];
@@ -44,7 +44,7 @@ window.DashboardScreenV2 = function DashboardScreenV2({ onOpenRequest, onNavigat
         <div style={{ position:'relative', display:'flex', justifyContent:'space-between', alignItems:'flex-end', gap:24, flexWrap:'wrap' }}>
           <div>
             <div style={{ fontSize:'var(--text-xs)', fontWeight:700, letterSpacing:'.08em', textTransform:'uppercase', opacity:.7, marginBottom:8 }}>Рабочий стол</div>
-            <h1 style={{ margin:0, fontSize:'var(--text-3xl)', fontWeight:800, letterSpacing:'-0.02em' }}>Оценка PRO</h1>
+            <h1 style={{ margin:0, fontSize:'var(--text-3xl)', fontWeight:800, letterSpacing:'-0.02em', color:'#fff' }}>Оценка ИИ</h1>
             <p style={{ margin:'8px 0 0', opacity:.85, fontSize:'var(--text-sm)', maxWidth:420, lineHeight:1.45 }}>
               {requests.length
                 ? `На доске ${requests.length} заявок · ${reviewCount} на проверке · ${readyCount} готовы`

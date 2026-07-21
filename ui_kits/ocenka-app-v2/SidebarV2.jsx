@@ -25,7 +25,7 @@ window.SidebarV2 = function SidebarV2({ active, onNavigate }) {
       <div className="ock-sidebar__brand" style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '18px 20px 16px' }}>
         <img src={(window.__resources && window.__resources.markSvg) || '../../assets/mark.svg'} alt="" style={{ width: 34, height: 34 }} />
         <div style={{ lineHeight: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: 0 }}>Оценка<span style={{ color: '#5DC393' }}> PRO</span></div>
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#fff', letterSpacing: 0 }}>Оценка<span style={{ color: '#5DC393' }}> ИИ</span></div>
           <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--text-on-sidebar-muted)', marginTop: 3 }}>Автоматизация оценки</div>
         </div>
       </div>

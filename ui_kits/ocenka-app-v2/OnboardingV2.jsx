@@ -69,6 +69,7 @@
       title: 'Разделы приложения',
       text: 'Левая навигация переводит между заявками, объектом, аналогами, расчетом, отчетом и проверкой ФСО.',
       placement: 'right',
+      panelOffset: { left: 24, top: 72 },
     },
     {
       id: 'new-request',
@@ -287,13 +288,19 @@
     return rect.width > 0 && rect.height > 0;
   }
 
-  function panelPosition(rect, placement) {
+  function panelPosition(rect, placement, options = {}) {
     const margin = 16;
     const gap = 16;
     const width = Math.min(380, window.innerWidth - margin * 2);
     const height = 240;
     const clampTop = (value) => Math.max(margin, Math.min(window.innerHeight - height - margin, value));
     const clampLeft = (value) => Math.max(margin, Math.min(window.innerWidth - width - margin, value));
+    const intersects = (left, top) => !(
+      left + width < rect.left - 8
+      || left > rect.right + 8
+      || top + height < rect.top - 8
+      || top > rect.bottom + 8
+    );
 
     /* Free space available on each side of the target. */
     const space = {
@@ -319,10 +326,21 @@
       left = clampLeft(rect.left + rect.width / 2 - width / 2);
       top = side === 'bottom' ? rect.bottom + gap : rect.top - height - gap;
     } else {
-      top = clampTop(rect.top + rect.height / 2 - height / 2);
+      top = clampTop(rect.top + Math.min(rect.height / 2, 120) - height / 2);
       left = side === 'right' ? rect.right + gap : rect.left - width - gap;
     }
-    return { top: clampTop(top), left: clampLeft(left), width };
+    top = clampTop(top);
+    left = clampLeft(left);
+
+    /* Keep the card off the highlighted target (e.g. full-height sidebar). */
+    if (intersects(left, top)) {
+      if (space.right >= width) left = clampLeft(rect.right + gap + (options.panelOffset?.left || 0));
+      else if (space.left >= width) left = clampLeft(rect.left - width - gap);
+      else if (space.bottom >= height) top = clampTop(rect.bottom + gap);
+      else if (space.top >= height) top = clampTop(rect.top - height - gap);
+      if (options.panelOffset?.top != null) top = clampTop(options.panelOffset.top);
+    }
+    return { top, left, width };
   }
 
   function buttonStyle(kind) {
@@ -374,6 +392,23 @@
 
   window.ContextHelpV2 = function ContextHelpV2({ active }) {
     const help = PAGE_HELP[active] || PAGE_HELP.dashboard;
+    const [tourHidden, setTourHidden] = React.useState(() => {
+      const state = readState();
+      return state.status === 'running' || state.status === 'offered';
+    });
+    React.useEffect(() => {
+      const sync = () => {
+        const state = readState();
+        setTourHidden(state.status === 'running');
+      };
+      window.addEventListener('ocenka:start-onboarding', sync);
+      const timer = window.setInterval(sync, 800);
+      return () => {
+        window.removeEventListener('ocenka:start-onboarding', sync);
+        window.clearInterval(timer);
+      };
+    }, []);
+    if (tourHidden) return null;
     return (
       <div data-tour-id="page-help" style={{
         display:'flex',
@@ -486,7 +521,7 @@
       if (current.event?.name) {
         window.setTimeout(() => {
           window.dispatchEvent(new CustomEvent(current.event.name, { detail: current.event.detail }));
-        }, 0);
+        }, 40);
       }
     }, [mode, stepIndex, active]);
 
@@ -498,7 +533,7 @@
         if (cancelled) return;
         const element = getTarget(current.target);
         if (element && targetVisible(element)) {
-          try { element.scrollIntoView({ behavior:'smooth', block:'center', inline:'center' }); } catch {}
+          try { element.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'nearest' }); } catch {}
           window.setTimeout(() => {
             if (cancelled) return;
             const nextRect = element.getBoundingClientRect();
@@ -506,18 +541,18 @@
               top: nextRect.top,
               left: nextRect.left,
               width: nextRect.width,
-              height: nextRect.height,
+              height: Math.min(nextRect.height, window.innerHeight - 24),
             });
             setTargetMissing(false);
-          }, 220);
+          }, 260);
           return;
         }
         attempts += 1;
         setRect(null);
-        setTargetMissing(attempts > 8);
-        if (attempts <= 10) window.setTimeout(refresh, 120);
+        setTargetMissing(attempts > 20);
+        if (attempts <= 24) window.setTimeout(refresh, 140);
       };
-      window.setTimeout(refresh, 80);
+      window.setTimeout(refresh, current.event ? 180 : 80);
       window.addEventListener('resize', refresh);
       window.addEventListener('scroll', refresh, true);
       return () => {
@@ -619,7 +654,7 @@
       height: rect.height + 12,
     } : null;
     const fallbackRect = { top: Math.round(window.innerHeight / 2 - 120), left: Math.round(window.innerWidth / 2 - 180), width: 360, height: 120 };
-    const pos = panelPosition(rect || fallbackRect, rect ? current.placement : 'bottom');
+    const pos = panelPosition(rect || fallbackRect, rect ? current.placement : 'bottom', current);
 
     return (
       <div style={{ position:'fixed', inset:0, zIndex:110, pointerEvents:'none' }} aria-live="polite">

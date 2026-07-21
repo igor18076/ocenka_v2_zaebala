@@ -2,7 +2,7 @@
 window.ClientsScreenV2 = function ClientsScreenV2({ toast }) {
   const { Card, Table, Button, Badge, Avatar, Input } = NS;
   const D = window.OcenkaData;
-  const storageKey = 'ocenka.clients.v1';
+  const storageKey = 'ocenka.clients.v2';
   const [clients, setClients] = React.useState(() => {
     const parsed = window.readLocalJson ? window.readLocalJson(storageKey, null) : null;
     return Array.isArray(parsed) ? parsed : (D.clients || []);
@@ -158,7 +158,7 @@ window.SettingsScreenV2 = function SettingsScreenV2({ toast }) {
     sro: savedSettings.sro || 'a',
     email: savedSettings.email || 'i.doroshenko@ocenka.pro',
     reportFormat: savedSettings.reportFormat || 'doc',
-    fsoAutocheck: savedSettings.fsoAutocheck ?? true,
+    fsoAutocheck: savedSettings.fsoAutocheck ?? false,
     includePhotos: savedSettings.includePhotos ?? true,
   });
   const [passwordDraft, setPasswordDraft] = React.useState({ current: '', next: '', confirm: '' });

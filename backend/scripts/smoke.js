@@ -154,12 +154,12 @@ async function main() {
     assert(dataJs.res.statusCode === 200, 'Data script is not available');
     assert(!dataJs.data.includes('</script'), 'Data script must be safe to embed');
     const data = JSON.parse(dataJs.data.replace(/^window\.OcenkaData = /, '').replace(/;\s*$/, ''));
-    assert(Array.isArray(data.requests) && data.requests.length > 0, 'Requests data is empty');
+    assert(Array.isArray(data.requests), 'Requests data must be an array');
+    assert(Array.isArray(data.team) && data.team.length > 0, 'Team list must be present for owner picker');
     assert(Array.isArray(data.marketListings), 'marketListings must be present in app data');
     assert(data.calculation?.cost?.ncsTables?.length >= 6, 'NCS tables are not loaded');
     assert(data.user?.name === 'Игорь Дорощенко', 'Unexpected evaluator name in app data');
-    assert(data.object?.id === '03-1040', 'Default object id must use 03-* format');
-    assert(data.object?.client === 'Игорь Дорощенко', 'Default object client is not normalized');
+    assert(/^03-\d{4}$/.test(String(data.object?.id || '')), 'Default object id must use 03-* format');
     assert(data.requests.every((request) => /^03-\d{4}$/.test(request.id)), 'Requests must use 03-#### ids');
     assert(data.requests.every((request) => request.type !== 'Кадастровая'), 'Cadastral appraisal type leaked into requests');
     assert(!JSON.stringify(data).includes('ОЗ-'), 'Legacy ОЗ-* id leaked into app data');

@@ -399,7 +399,7 @@ function renderLoginPage(errorText = '') {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Вход · Оценка PRO</title>
+<title>Вход · Оценка ИИ</title>
 <link rel="stylesheet" href="/styles.css">
 <style>
   html, body { min-height: 100%; }
@@ -515,7 +515,7 @@ function renderLoginPage(errorText = '') {
       <div class="auth-brand">
         <div class="auth-mark">О</div>
         <div>
-          <h1 class="auth-title" id="login-title">Оценка PRO</h1>
+          <h1 class="auth-title" id="login-title">Оценка ИИ</h1>
           <p class="auth-subtitle">Вход в рабочее пространство оценщика</p>
         </div>
       </div>
@@ -741,8 +741,18 @@ function loadOcenkaData() {
       formats: safeJsonParse(reportSettings?.formats, ['DOC'])
     };
 
+    let team = [user.name].filter(Boolean);
+    try {
+      const seedPath = path.join(rootDir, 'backend', 'seed', 'initial-data.json');
+      const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+      if (Array.isArray(seed.team)) {
+        team = [...new Set([user.name, ...seed.team].filter(Boolean))];
+      }
+    } catch {}
+
     return {
       user,
+      team,
       nav,
       kpis,
       requests,

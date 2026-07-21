@@ -62,14 +62,18 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast, onNavigate }) 
   });
   const doneSections = liveSections.filter((section) => section.done).length;
   const reportReady = Math.round((doneSections / (liveSections.length || 1)) * 100);
-  const ensureFsoReady = () => {
+  const ensureFsoReady = (mode = 'warn') => {
     if (settings.fsoAutocheck === false) return true;
     const open = window.OcenkaFso ? window.OcenkaFso.openCount(o.id) : 0;
     if (open <= 0) return true;
-    if (toast) toast(`Сначала закройте пункты ФСО (${open} открыто)`);
-    if (onNavigate) onNavigate('fso');
-    else if (window.ocenkaGoTo) window.ocenkaGoTo('fso');
-    return false;
+    if (mode === 'block') {
+      if (toast) toast(`Сначала закройте пункты ФСО (${open} открыто)`);
+      if (onNavigate) onNavigate('fso');
+      else if (window.ocenkaGoTo) window.ocenkaGoTo('fso');
+      return false;
+    }
+    if (toast) toast(`Внимание: открыто пунктов ФСО — ${open}. Отчёт всё равно скачивается.`);
+    return true;
   };
   React.useEffect(() => {
     try {
@@ -98,7 +102,15 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast, onNavigate }) 
   const reportAddress = escapeHtml(o.address);
   const reportClient = escapeHtml(o.client);
   const reportEvaluator = escapeHtml(settings.name || window.OcenkaData.user?.name || 'Игорь Дорощенко');
-  const photoUrls = Array.isArray(o.photoUrls) ? o.photoUrls.filter(Boolean).slice(0, 6) : [];
+  const photoUrls = Array.isArray(o.photoUrls)
+    ? o.photoUrls.filter((src) => {
+      const value = String(src || '');
+      if (!value) return false;
+      /* Keep report downloads light: skip oversized in-browser data URLs. */
+      if (value.startsWith('data:') && value.length > 350000) return false;
+      return true;
+    }).slice(0, 6)
+    : [];
   const photosHtml = settings.includePhotos === false
     ? ''
     : photoUrls.length
@@ -106,35 +118,44 @@ window.ReportScreenV2 = function ReportScreenV2({ request, toast, onNavigate }) 
       : `<h2>Фотографии объекта</h2><div class="photos">${Array.from({ length: Math.min(toNum(o.photos), 6) }).map((_, index) => `<div class="photo">Фото ${index + 1}</div>`).join('')}</div>`;
   const reportHtml = () => `<!doctype html><html><head><meta charset="utf-8"><title>Отчет ${reportId}</title><style>body{font-family:Arial,sans-serif;line-height:1.45;color:#111}table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f3f4f6}.num{text-align:right}.photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.photo{height:88px;border:1px solid #ccc;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#555}</style></head><body><h1>Отчет об оценке №${reportId}</h1><p><b>Объект:</b> ${reportTitle}</p><p><b>Адрес:</b> ${reportAddress}</p><p><b>Заказчик:</b> ${reportClient}</p><p><b>Оценщик:</b> ${reportEvaluator}</p><p><b>Итоговая стоимость:</b> ${fmt(finalValue)} ₽</p>${photosHtml}<h2>Таблица 6. Расчет доходным методом</h2><table><tr><th>Аналог</th><th>Ставка</th><th>Корр.</th><th>Вес</th><th>Скорр. ставка</th></tr>${rentRows.map((row) => { const correction = toNum(row.adjLoc) + toNum(row.adjCond); const adjusted = Math.round(toNum(row.rentPerM2) * (1 + correction / 100)); return `<tr><td>${escapeHtml(row.addr)}</td><td class="num">${fmt(toNum(row.rentPerM2))}</td><td class="num">${correction}%</td><td class="num">${toNum(row.weight).toFixed(3)}</td><td class="num">${fmt(adjusted)}</td></tr>`; }).join('')}</table><h2>Таблица 8. Финальный расчет</h2><table><tr><th>Подход</th><th>Стоимость</th><th>Вес</th><th>Вклад</th></tr>${finalRows.map((row) => `<tr><td>${escapeHtml(row.name)}</td><td class="num">${fmt(toNum(row.value))} ₽</td><td class="num">${toNum(row.weight).toFixed(2)}%</td><td class="num">${fmt(toNum(row.value) * toNum(row.weight) / 100)} ₽</td></tr>`).join('')}<tr><th>Итого</th><th colspan="3" class="num">${fmt(finalValue)} ₽</th></tr></table></body></html>`;
   const downloadDoc = () => {
-    if (!ensureFsoReady()) return;
-    const blob = new Blob([reportHtml()], { type:'application/msword;charset=utf-8' });
-    window.downloadBlob(blob, `report-${o.id}.doc`);
-    toast('Файл DOC сформирован и загружается');
+    ensureFsoReady('warn');
+    try {
+      const html = reportHtml();
+      const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' });
+      window.downloadBlob(blob, `report-${o.id}.doc`);
+      if (toast) toast('Файл DOC сформирован и загружается');
+    } catch (error) {
+      if (toast) toast(`Не удалось скачать отчёт: ${error?.message || 'ошибка'}`);
+    }
   };
   const openPdfPrint = () => {
-    if (!ensureFsoReady()) return;
-    const win = window.open('', '_blank');
-    if (!win) {
-      toast('Разрешите всплывающие окна для печати PDF');
-      return;
+    ensureFsoReady('warn');
+    try {
+      const win = window.open('', '_blank');
+      if (!win) {
+        if (toast) toast('Разрешите всплывающие окна для печати PDF');
+        return;
+      }
+      win.opener = null;
+      win.document.write(reportHtml());
+      win.document.close();
+      win.focus();
+      win.print();
+    } catch (error) {
+      if (toast) toast(`Не удалось открыть PDF: ${error?.message || 'ошибка'}`);
     }
-    win.opener = null;
-    win.document.write(reportHtml());
-    win.document.close();
-    win.focus();
-    win.print();
   };
   const downloadDefault = () => {
     if ((settings.reportFormat || 'doc') === 'pdf') openPdfPrint();
     else downloadDoc();
   };
   const sendToReview = () => {
-    if (!ensureFsoReady()) return;
+    if (!ensureFsoReady('block')) return;
     setReviewSent(true);
     try {
       window.localStorage.setItem(`ocenka.report.review.${o.id}.v1`, '1');
     } catch {}
-    const kanbanKey = 'ocenka.requests.kanban.v1';
+    const kanbanKey = 'ocenka.requests.kanban.v2';
     const current = window.readLocalJson ? window.readLocalJson(kanbanKey, null) : null;
     const base = Array.isArray(current) ? current : (window.OcenkaData.requests || []);
     let found = false;

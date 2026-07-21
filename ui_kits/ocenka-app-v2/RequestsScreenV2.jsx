@@ -11,7 +11,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest, toast }) {
     window.setTimeout(() => { selfEmitRef.current = false; }, 0);
   };
 
-  const clientsKey = 'ocenka.clients.v1';
+  const clientsKey = 'ocenka.clients.v2';
   const loadClients = () => {
     const parsed = window.readLocalJson ? window.readLocalJson(clientsKey, null) : null;
     return Array.isArray(parsed) ? parsed : (D.clients || []);
@@ -57,7 +57,7 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest, toast }) {
     review: 'контроль качества',
     ready: 'отчет готов',
   };
-  const storageKey = 'ocenka.requests.kanban.v1';
+  const storageKey = 'ocenka.requests.kanban.v2';
 
   const [requests, setRequests] = React.useState(() => {
     const parsed = window.readLocalJson ? window.readLocalJson(storageKey, null) : null;
@@ -153,6 +153,12 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest, toast }) {
   };
   const normalize = (value) => String(value || '').trim().toLowerCase();
   const owners = Array.from(new Set(requests.map((item) => item.owner).filter(hasOwner))).sort();
+  const teamOptions = Array.from(new Set([
+    ...(Array.isArray(D.team) ? D.team : []),
+    D.user?.name,
+    (window.readLocalJson ? window.readLocalJson('ocenka.settings.v1', {}) : {})?.name,
+    ...owners,
+  ].filter(hasOwner))).sort((a, b) => a.localeCompare(b, 'ru'));
   const createTypes = ['Рыночная', 'Залоговая'];
   const types = Array.from(new Set(requests.map((item) => item.type).filter(Boolean))).sort();
   const clientOptions = Array.from(new Set([...clientList.map((item) => item.name), draft.client].filter(Boolean)));
@@ -623,7 +629,19 @@ window.RequestsScreenV2 = function RequestsScreenV2({ onOpenRequest, toast }) {
                     {(createTypes.length ? createTypes : ['Рыночная']).map((type) => <option key={type} value={type}>{type}</option>)}
                   </select>
                 </div>
-                <Input label="Ответственный" required value={draft.owner} onChange={(event) => setDraft((prev) => ({ ...prev, owner:event.target.value }))} placeholder="ФИО ответственного" />
+                <label style={fieldLabel}>Ответственный <span style={{ color:'var(--danger, #dc2626)' }}>*</span></label>
+                <select
+                  required
+                  value={draft.owner}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, owner: event.target.value }))}
+                  style={{ ...selectStyle, height: 38 }}
+                >
+                  <option value="">Выберите ответственного</option>
+                  {teamOptions.map((owner) => <option key={owner} value={owner}>{owner}</option>)}
+                  {draft.owner && !teamOptions.includes(draft.owner) ? (
+                    <option value={draft.owner}>{draft.owner}</option>
+                  ) : null}
+                </select>
               </div>
               <div>
                 <label style={fieldLabel}>Стадия</label>
